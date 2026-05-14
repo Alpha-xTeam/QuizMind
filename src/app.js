@@ -284,7 +284,7 @@ function showResults() {
     let message, color;
     if (score >= 90) { message = 'ممتاز! 🎉'; color = '#22c55e'; }
     else if (score >= 70) { message = 'جيد جدًا! 👍'; color = '#3b82f6'; }
-    else if (score >= 50) { message = 'جيد 📚'; color = '#f59e0b'; }
+    else if (score >= 50) { message = 'جيد 📚'; color = '#10b981'; }
     else { message = 'حاول مرة أخرى 💪'; color = '#ef4444'; }
 
     DOM.scoreMessage.textContent = message;
@@ -353,9 +353,9 @@ DOM.downloadPdfBtn.addEventListener('click', async () => {
   wrapper.id = 'pdf-export';
   wrapper.style.cssText = `position:fixed;left:-9999px;top:0;width:800px;background:#fff;padding:48px;font-family:'Cairo',sans-serif;direction:${isEnglish ? 'ltr' : 'rtl'};text-align:${isEnglish ? 'left' : 'right'}`;
   wrapper.innerHTML = `
-    <div style="text-align:center;margin-bottom:32px;border-bottom:2px solid #f59e0b;padding-bottom:16px">
+    <div style="text-align:center;margin-bottom:32px;border-bottom:2px solid #10b981;padding-bottom:16px">
       <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:4px">
-        <svg width="20" height="20" viewBox="0 0 20 20"><rect width="20" height="20" rx="4" fill="#f59e0b"/><path d="M5 10l4 4 6-6" stroke="#000" stroke-width="2" fill="none"/></svg>
+        <svg width="20" height="20" viewBox="0 0 20 20"><rect width="20" height="20" rx="4" fill="#10b981"/><path d="M5 10l4 4 6-6" stroke="#000" stroke-width="2" fill="none"/></svg>
         <span style="font-size:18px;font-weight:700;color:#111">QuizMind</span>
       </div>
       <h1 style="font-size:22px;font-weight:700;color:#111;margin:8px 0">${title}</h1>
@@ -380,7 +380,7 @@ DOM.downloadPdfBtn.addEventListener('click', async () => {
             <span style="color:#666">إجابتك:</span> ${userLabel}
             ${!isCorrect ? `<span style="color:#666;margin-right:12px">الإجابة الصحيحة:</span> ${correctLabel}` : ''}
           </div>
-          ${q.explanation ? `<div style="margin-top:8px;padding:8px 12px;background:#f5f5f5;border-radius:6px;font-size:12px;color:#555"><strong style="color:#f59e0b">شرح:</strong> ${q.explanation}</div>` : ''}
+          ${q.explanation ? `<div style="margin-top:8px;padding:8px 12px;background:#f5f5f5;border-radius:6px;font-size:12px;color:#555"><strong style="color:#10b981">شرح:</strong> ${q.explanation}</div>` : ''}
         </div>
       `;
     }).join('')}
