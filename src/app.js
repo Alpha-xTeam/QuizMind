@@ -5,6 +5,8 @@ const state = {
   currentQuestion: 0,
   answers: [],
   reviewed: false,
+  timer: null,
+  timeLeft: 0,
 };
 
 const DOM = {
@@ -33,21 +35,146 @@ const DOM = {
   nextBtn: document.getElementById('nextBtn'),
   submitBtn: document.getElementById('submitBtn'),
 
+  timerBadge: document.getElementById('timerBadge'),
+  timerDisplay: document.getElementById('timerDisplay'),
+
   scoreNumber: document.getElementById('scoreNumber'),
   scoreCircle: document.getElementById('scoreCircle'),
   scoreMessage: document.getElementById('scoreMessage'),
   scoreDetails: document.getElementById('scoreDetails'),
   reviewBtn: document.getElementById('reviewBtn'),
+  shareBtn: document.getElementById('shareBtn'),
   downloadPdfBtn: document.getElementById('downloadPdfBtn'),
   newQuizBtn: document.getElementById('newQuizBtn'),
   reviewSection: document.getElementById('reviewSection'),
   reviewContainer: document.getElementById('reviewContainer'),
+
+  themeBtn: document.getElementById('themeBtn'),
+  themeIcon: document.getElementById('themeIcon'),
+  fullscreenBtn: document.getElementById('fullscreenBtn'),
+  historyBtn: document.getElementById('historyBtn'),
+  historySection: document.getElementById('historySection'),
+  historyList: document.getElementById('historyList'),
+  historyEmpty: document.getElementById('historyEmpty'),
+  clearHistoryBtn: document.getElementById('clearHistoryBtn'),
+  backFromHistoryBtn: document.getElementById('backFromHistoryBtn'),
 };
 
 const LABELS_AR = ['أ', 'ب', 'ج', 'د'];
 const LABELS_EN = ['A', 'B', 'C', 'D'];
+const HISTORY_KEY = 'quizmind_history';
 
-// File upload handling
+// ─── Snackbar ───────────────────────────────────────
+
+function showSnackbar(msg) {
+  let el = document.querySelector('.snackbar');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'snackbar';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._hide);
+  el._hide = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ─── Theme ──────────────────────────────────────────
+
+const savedTheme = localStorage.getItem('quizmind_theme');
+if (savedTheme === 'light') {
+  document.documentElement.setAttribute('data-theme', 'light');
+  document.querySelector('meta[name="theme-color"]').content = '#f5f5f5';
+}
+
+DOM.themeBtn.addEventListener('click', () => {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  if (isLight) {
+    document.documentElement.removeAttribute('data-theme');
+    document.querySelector('meta[name="theme-color"]').content = '#0d0d0d';
+    localStorage.setItem('quizmind_theme', 'dark');
+  } else {
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.querySelector('meta[name="theme-color"]').content = '#f5f5f5';
+    localStorage.setItem('quizmind_theme', 'light');
+  }
+});
+
+// ─── Fullscreen ─────────────────────────────────────
+
+DOM.fullscreenBtn.addEventListener('click', () => {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen?.();
+  } else {
+    document.exitFullscreen?.();
+  }
+});
+
+document.addEventListener('fullscreenchange', () => {
+  DOM.fullscreenBtn.classList.toggle('active', !!document.fullscreenElement);
+});
+
+// ─── History (localStorage) ─────────────────────────
+
+function getHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
+  catch { return []; }
+}
+
+function addHistory(entry) {
+  const list = getHistory();
+  list.unshift({ ...entry, date: Date.now() });
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, 50)));
+}
+
+function renderHistory() {
+  const list = getHistory();
+  DOM.historyEmpty.hidden = list.length > 0;
+  DOM.historyList.innerHTML = list.map((e, i) => {
+    const pct = Math.round((e.correct / e.total) * 100);
+    const cls = pct < 50 ? 'low' : '';
+    const date = new Date(e.date).toLocaleDateString('ar-SA');
+    return `
+      <div class="history-card">
+        <div class="history-card-info">
+          <h4>${e.title || 'امتحان'}</h4>
+          <span>${date} &middot; ${e.difficulty || ''}</span>
+        </div>
+        <div class="history-card-score ${cls}">${e.correct}/${e.total}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+let historySource = 'upload';
+
+DOM.historyBtn.addEventListener('click', () => {
+  if (DOM.historySection.hidden) {
+    historySource = DOM.uploadSection.hidden ? 'results' : 'upload';
+    DOM.historySection.hidden = false;
+    if (historySource === 'upload') DOM.uploadSection.hidden = true;
+    renderHistory();
+  } else {
+    DOM.historySection.hidden = true;
+    if (historySource === 'upload') DOM.uploadSection.hidden = false;
+  }
+});
+
+DOM.backFromHistoryBtn.addEventListener('click', () => {
+  DOM.historySection.hidden = true;
+  if (historySource === 'upload') DOM.uploadSection.hidden = false;
+});
+
+DOM.clearHistoryBtn.addEventListener('click', () => {
+  if (confirm('حذف جميع الامتحانات السابقة؟')) {
+    localStorage.removeItem(HISTORY_KEY);
+    renderHistory();
+    showSnackbar('تم الحذف');
+  }
+});
+
+// ─── File handling ──────────────────────────────────
+
 DOM.uploadZone.addEventListener('click', () => DOM.fileInput.click());
 
 DOM.uploadZone.addEventListener('dragover', (e) => {
@@ -82,13 +209,11 @@ function handleFile(file) {
     alert('حجم الملف كبير جدًا. الحد الأقصى 10MB');
     return;
   }
-
   const ext = file.name.split('.').pop().toLowerCase();
   if (!['pdf', 'txt'].includes(ext)) {
     alert('يرجى رفع ملف PDF أو TXT فقط');
     return;
   }
-
   state.file = file;
   DOM.fileName.textContent = file.name;
   DOM.fileSize.textContent = formatSize(file.size);
@@ -110,45 +235,37 @@ function formatSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-// Extract text from file
 async function extractText(file) {
   const ext = file.name.split('.').pop().toLowerCase();
-
-  if (ext === 'txt') {
-    return await file.text();
-  }
-
+  if (ext === 'txt') return await file.text();
   if (ext === 'pdf') {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     let text = '';
-
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
-      const pageText = content.items.map((item) => item.str).join(' ');
-      text += pageText + '\n\n';
+      text += content.items.map((item) => item.str).join(' ') + '\n\n';
     }
-
     return text.trim();
   }
-
   throw new Error('Unsupported file format');
 }
 
-// Generate quiz
+// ─── Generate quiz ──────────────────────────────────
+
 DOM.generateBtn.addEventListener('click', async () => {
   if (!state.file) return;
 
   DOM.uploadSection.hidden = true;
   DOM.loadingSection.hidden = false;
+  DOM.historySection.hidden = true;
 
   try {
     state.fileText = await extractText(state.file);
-
     if (!state.fileText || state.fileText.length < 20) {
-      alert('لم يتم العثور على نص كافٍ في الملف. تأكد من أن الملف يحتوي على محتوى نصي.');
-      throw new Error('Insufficient text content');
+      alert('لم يتم العثور على نص كافٍ في الملف.');
+      throw new Error('Insufficient text');
     }
 
     const numQuestions = parseInt(DOM.numQuestions.value);
@@ -168,7 +285,7 @@ DOM.generateBtn.addEventListener('click', async () => {
 
     if (!response.ok) {
       const err = await response.json();
-      throw new Error(err.error || 'Failed to generate quiz');
+      throw new Error(err.error || 'Failed');
     }
 
     state.quiz = await response.json();
@@ -180,6 +297,8 @@ DOM.generateBtn.addEventListener('click', async () => {
     DOM.quizSection.classList.toggle('dir-ltr', isEnglish);
     renderQuiz(isEnglish);
     DOM.quizSection.hidden = false;
+
+    startTimer(state.quiz.questions.length);
   } catch (error) {
     DOM.loadingSection.hidden = true;
     DOM.uploadSection.hidden = false;
@@ -187,14 +306,46 @@ DOM.generateBtn.addEventListener('click', async () => {
   }
 });
 
-// Render Quiz
+// ─── Timer ──────────────────────────────────────────
+
+function startTimer(questionCount) {
+  stopTimer();
+  state.timeLeft = questionCount * 30;
+  DOM.timerBadge.hidden = false;
+  DOM.timerBadge.classList.remove('warning');
+  renderTimer();
+  state.timer = setInterval(() => {
+    state.timeLeft--;
+    renderTimer();
+    if (state.timeLeft <= 10) DOM.timerBadge.classList.add('warning');
+    if (state.timeLeft <= 0) {
+      stopTimer();
+      showResults();
+    }
+  }, 1000);
+}
+
+function stopTimer() {
+  if (state.timer) {
+    clearInterval(state.timer);
+    state.timer = null;
+  }
+  DOM.timerBadge.hidden = true;
+}
+
+function renderTimer() {
+  const m = String(Math.floor(state.timeLeft / 60)).padStart(2, '0');
+  const s = String(state.timeLeft % 60).padStart(2, '0');
+  DOM.timerDisplay.textContent = `${m}:${s}`;
+}
+
+// ─── Render quiz ────────────────────────────────────
+
 function renderQuiz(isEnglish) {
-  const questions = state.quiz.questions;
   window._labels = isEnglish ? LABELS_EN : LABELS_AR;
   DOM.quizTitle.textContent = state.quiz.title || 'الامتحان';
-  DOM.totalQuestions.textContent = questions.length;
+  DOM.totalQuestions.textContent = state.quiz.questions.length;
   DOM.submitBtn.hidden = true;
-
   showQuestion(0);
 }
 
@@ -240,29 +391,67 @@ function showQuestion(index) {
   }
 }
 
-// Navigation
+// ─── Navigation ─────────────────────────────────────
+
 DOM.prevBtn.addEventListener('click', () => {
-  if (state.currentQuestion > 0) {
-    showQuestion(state.currentQuestion - 1);
-  }
+  if (state.currentQuestion > 0) showQuestion(state.currentQuestion - 1);
 });
 
 DOM.nextBtn.addEventListener('click', () => {
-  if (state.currentQuestion < state.quiz.questions.length - 1) {
+  if (state.currentQuestion < state.quiz.questions.length - 1)
     showQuestion(state.currentQuestion + 1);
-  }
 });
 
 DOM.submitBtn.addEventListener('click', showResults);
 
-// Results
-function showResults() {
-  const questions = state.quiz.questions;
+// ─── Keyboard shortcuts ────────────────────────────
 
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+
+  if (!state.quiz || DOM.quizSection.hidden) return;
+
+  const idx = state.currentQuestion;
+  const q = state.quiz.questions[idx];
+  const answered = state.answers[idx] !== null && state.answers[idx] !== undefined;
+
+  if (e.key >= '1' && e.key <= '4' && !answered) {
+    const i = parseInt(e.key) - 1;
+    if (i < q.options.length) {
+      state.answers[idx] = i;
+      showQuestion(idx);
+    }
+    return;
+  }
+
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (idx < state.quiz.questions.length - 1) showQuestion(idx + 1);
+    return;
+  }
+
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (idx > 0) showQuestion(idx - 1);
+    return;
+  }
+
+  if (e.key === 'Enter') {
+    if (!DOM.submitBtn.hidden) showResults();
+    else if (idx < state.quiz.questions.length - 1) showQuestion(idx + 1);
+  }
+});
+
+// ─── Results ────────────────────────────────────────
+
+function showResults() {
+  stopTimer();
+
+  const questions = state.quiz.questions;
   const unanswered = state.answers.some((a) => a === null || a === undefined);
   if (unanswered) {
     const confirmed = confirm('هناك أسئلة لم تجب عليها. هل تريد إنهاء الامتحان؟');
-    if (!confirmed) return;
+    if (!confirmed) { startTimer(questions.length); return; }
   }
 
   let correct = 0;
@@ -272,11 +461,18 @@ function showResults() {
 
   const score = Math.round((correct / questions.length) * 100);
 
+  addHistory({
+    title: state.quiz.title,
+    correct,
+    total: questions.length,
+    difficulty: DOM.difficulty.value,
+  });
+
   DOM.quizSection.hidden = true;
   DOM.resultsSection.hidden = false;
 
+  const circumference = 314;
   setTimeout(() => {
-    const circumference = 314;
     const offset = circumference - (score / 100) * circumference;
     DOM.scoreCircle.style.strokeDashoffset = offset;
     DOM.scoreNumber.textContent = score;
@@ -297,7 +493,48 @@ function showResults() {
   DOM.reviewSection.hidden = true;
 }
 
-// Review
+// ─── Share ──────────────────────────────────────────
+
+DOM.shareBtn.addEventListener('click', () => {
+  const questions = state.quiz.questions;
+  let correct = 0;
+  questions.forEach((q, i) => {
+    if (state.answers[i] === q.correctAnswer) correct++;
+  });
+
+  const text = [
+    `🧠 QuizMind - نتيجة الامتحان`,
+    `━━━━━━━━━━━━━━━━`,
+    `${state.quiz.title || ''}`,
+    `النتيجة: ${correct}/${questions.length} (${Math.round((correct / questions.length) * 100)}%)`,
+    `التاريخ: ${new Date().toLocaleDateString('ar-SA')}`,
+  ].join('\n');
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      showSnackbar('تم نسخ النتيجة');
+    }).catch(() => {
+      fallbackCopy(text);
+    });
+  } else {
+    fallbackCopy(text);
+  }
+});
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); showSnackbar('تم نسخ النتيجة'); }
+  catch { alert('تعذر النسخ'); }
+  ta.remove();
+}
+
+// ─── Review ─────────────────────────────────────────
+
 DOM.reviewBtn.addEventListener('click', () => {
   if (state.reviewed) {
     DOM.reviewSection.hidden = !DOM.reviewSection.hidden;
@@ -337,7 +574,8 @@ DOM.reviewBtn.addEventListener('click', () => {
   }).join('');
 });
 
-// Download PDF
+// ─── Download PDF ───────────────────────────────────
+
 DOM.downloadPdfBtn.addEventListener('click', async () => {
   const { jsPDF } = window.jspdf;
   const questions = state.quiz.questions;
@@ -396,22 +634,19 @@ DOM.downloadPdfBtn.addEventListener('click', async () => {
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
     let heightLeft = pdfHeight;
     let position = 0;
     const pageHeight = pdf.internal.pageSize.getHeight();
-
-    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+    pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight);
     heightLeft -= pageHeight;
-
     while (heightLeft > 0) {
       position -= pageHeight;
       pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+      pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight);
       heightLeft -= pageHeight;
     }
-
-    pdf.save(`QuizMind-${title.substring(0, 30).replace(/[^a-zA-Z0-9_\-\u0600-\u06FF]/g, '')}.pdf`);
+    const fname = `QuizMind-${title.substring(0, 30).replace(/[^a-zA-Z0-9_\-\u0600-\u06FF]/g, '')}.pdf`;
+    pdf.save(fname);
   } catch (err) {
     alert('حدث خطأ أثناء إنشاء PDF');
   } finally {
@@ -419,8 +654,10 @@ DOM.downloadPdfBtn.addEventListener('click', async () => {
   }
 });
 
-// New Quiz
+// ─── New Quiz ───────────────────────────────────────
+
 DOM.newQuizBtn.addEventListener('click', () => {
+  stopTimer();
   state.quiz = null;
   state.answers = [];
   state.currentQuestion = 0;
@@ -429,6 +666,7 @@ DOM.newQuizBtn.addEventListener('click', () => {
   DOM.resultsSection.hidden = true;
   DOM.reviewSection.hidden = true;
   DOM.quizSection.hidden = true;
+  DOM.historySection.hidden = true;
   DOM.uploadSection.hidden = false;
   DOM.scoreCircle.style.strokeDashoffset = 314;
   resetFile();
