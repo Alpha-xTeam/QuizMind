@@ -32,8 +32,7 @@ export const handler = async (event) => {
       hard: 'Ask analysis and application questions: require critical thinking, synthesizing multiple concepts, applying knowledge to new scenarios, and evaluating ideas. Options should be tricky and closely related.',
     };
 
-    // Reduce input text for many questions to keep response fast
-    const maxInput = numQuestions <= 5 ? 25000 : numQuestions <= 10 ? 15000 : 8000;
+    const maxInput = 25000;
     const truncated = text.substring(0, maxInput);
 
     const prompt = `You are a quiz generator. Based on the following lecture content, create a quiz with exactly ${numQuestions} multiple-choice questions.
@@ -78,7 +77,7 @@ ${truncated}`;
             { role: 'user', content: prompt },
           ],
           temperature: 0.7,
-          max_tokens: numQuestions <= 5 ? 4096 : numQuestions <= 10 ? 6144 : 8192,
+          max_tokens: 4096,
         }),
       });
     } catch (fetchError) {
