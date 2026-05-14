@@ -1,5 +1,5 @@
-const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY;
-const MISTRAL_API_URL = 'https://api.mistral.ai/v1/chat/completions';
+const API_KEY = process.env.NVIDIA_API_KEY;
+const API_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
 
 export const handler = async (event) => {
   const headers = {
@@ -11,7 +11,7 @@ export const handler = async (event) => {
 
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
-  if (!MISTRAL_API_KEY) return { statusCode: 500, headers, body: JSON.stringify({ error: 'Server configuration error' }) };
+  if (!API_KEY) return { statusCode: 500, headers, body: JSON.stringify({ error: 'Server configuration error' }) };
   if (!event.body || event.body.length > 500000) return { statusCode: 413, headers, body: JSON.stringify({ error: 'Request too large' }) };
 
   const contentType = event.headers['content-type'] || '';
@@ -26,24 +26,34 @@ export const handler = async (event) => {
     if (text.length > 50000) return { statusCode: 413, headers, body: JSON.stringify({ error: 'Text too large' }) };
 
     const difficultyHint = { easy: 'basic recall', medium: 'comprehension', hard: 'analysis' };
-    const truncated = text.substring(0, 5000);
+    const truncated = text.substring(0, 8000);
 
-    const prompt = `Create a ${language} quiz with ${numQuestions} MCQs from this text. Difficulty: ${difficultyHint[difficulty] || 'comprehension'}. Each question: 4 options, one correct. Return JSON only: {"title":"...","questions":[{"question":"...","options":["A","B","C","D"],"correctAnswer":0,"explanation":"..."}]}\n\n${truncated}`;
+    const prompt = `Create a ${language} quiz with ${numQuestions} multiple-choice questions from this lecture text. Difficulty: ${difficultyHint[difficulty] || 'comprehension'}.
+
+Each question must have exactly 4 options with one correct answer. Include a brief explanation.
+
+Return ONLY valid JSON (no markdown, no code fences, no thinking tags) with this structure:
+{"title":"Quiz title","questions":[{"question":"...","options":["A","B","C","D"],"correctAnswer":0,"explanation":"..."}]}
+
+Text:
+${truncated}`;
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), 15000);
 
     let response;
     try {
-      response = await fetch(MISTRAL_API_URL, {
+      response = await fetch(API_URL, {
         signal: controller.signal,
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MISTRAL_API_KEY}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY}` },
         body: JSON.stringify({
-          model: 'mistral-tiny-latest',
+          model: 'google/gemma-4-31b-it',
           messages: [{ role: 'user', content: prompt }],
-          temperature: 0.7,
-          max_tokens: 1024,
+          max_tokens: 4096,
+          temperature: 1.00,
+          top_p: 0.95,
+          chat_template_kwargs: { enable_thinking: true },
         }),
       });
     } catch (fetchError) {
@@ -58,12 +68,15 @@ export const handler = async (event) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      return { statusCode: response.status, headers, body: JSON.stringify({ error: `Mistral API error: ${errorText}` }) };
+      return { statusCode: response.status, headers, body: JSON.stringify({ error: `API error: ${errorText}` }) };
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No response from Mistral' }) };
+    let content = data.choices?.[0]?.message?.content;
+    if (!content) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No response from API' }) };
+
+    // Strip thinking tags (Gemma 4 with enable_thinking wraps reasoning in <｜end▁of▁thinking｜> ...)
+    content = content.replace(/[\s\S]*?<\/think>/g, '').trim();
 
     let quiz;
     try {
