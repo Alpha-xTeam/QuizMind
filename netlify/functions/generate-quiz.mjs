@@ -22,7 +22,7 @@ export const handler = async (event) => {
   }
 
   try {
-    const { text, numQuestions = 5, language = 'arabic' } = JSON.parse(event.body);
+    const { text, numQuestions = 5, difficulty = 'medium', language = 'arabic' } = JSON.parse(event.body);
 
     if (!text || text.trim().length === 0) {
       return {
@@ -31,6 +31,12 @@ export const handler = async (event) => {
         body: JSON.stringify({ error: 'No lecture text provided' }),
       };
     }
+
+    const difficultyGuide = {
+      easy: 'Ask basic recall questions: direct definitions, simple facts, and obvious concepts from the text. Options should have one clearly correct answer with the rest being noticeably wrong. Keep wording simple.',
+      medium: 'Ask comprehension questions: require understanding of the material, ability to explain concepts in own words, and connect related ideas. Options should be plausible but distinguishable.',
+      hard: 'Ask analysis and application questions: require critical thinking, synthesizing multiple concepts, applying knowledge to new scenarios, and evaluating ideas. Options should be tricky and closely related.',
+    };
 
     const prompt = `You are a quiz generator. Based on the following lecture content, create a quiz with exactly ${numQuestions} multiple-choice questions.
 
@@ -49,6 +55,8 @@ Return ONLY valid JSON (no markdown, no code fences, no extra text) with this ex
   ]
 }
 
+Difficulty level: ${difficulty}
+Difficulty instructions: ${difficultyGuide[difficulty] || difficultyGuide.medium}
 Language: ${language}
 Lecture content:
 ${text.substring(0, 30000)}`;

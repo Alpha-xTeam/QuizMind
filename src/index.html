@@ -58,9 +58,17 @@
               </select>
             </div>
             <div class="option-group">
+              <label for="difficulty">مستوى الصعوبة:</label>
+              <select id="difficulty">
+                <option value="easy" selected>سهل</option>
+                <option value="medium">متوسط</option>
+                <option value="hard">صعب</option>
+              </select>
+            </div>
+            <div class="option-group">
               <label for="language">لغة الامتحان:</label>
               <select id="language">
-                <option value="arabic" selected>العربية</option>
+                <option value="arabic" selected">العربية</option>
                 <option value="english">English</option>
               </select>
             </div>
@@ -166,6 +174,13 @@
               </svg>
               مراجعة الإجابات
             </button>
+            <button class="btn-secondary" id="downloadPdfBtn">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2V10M8 10L11 7M8 10L5 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M2 11V13C2 13.5523 2.44772 14 3 14H13C13.5523 14 14 13.5523 14 13V11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+              تحميل PDF
+            </button>
             <button class="btn-primary" id="newQuizBtn">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M8 2V14M2 8H14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
@@ -201,6 +216,8 @@
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

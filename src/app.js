@@ -16,6 +16,7 @@ const DOM = {
   fileSize: document.getElementById('fileSize'),
   removeFileBtn: document.getElementById('removeFileBtn'),
   numQuestions: document.getElementById('numQuestions'),
+  difficulty: document.getElementById('difficulty'),
   language: document.getElementById('language'),
 
   uploadSection: document.getElementById('uploadSection'),
@@ -37,6 +38,7 @@ const DOM = {
   scoreMessage: document.getElementById('scoreMessage'),
   scoreDetails: document.getElementById('scoreDetails'),
   reviewBtn: document.getElementById('reviewBtn'),
+  downloadPdfBtn: document.getElementById('downloadPdfBtn'),
   newQuizBtn: document.getElementById('newQuizBtn'),
   reviewSection: document.getElementById('reviewSection'),
   reviewContainer: document.getElementById('reviewContainer'),
@@ -150,6 +152,7 @@ DOM.generateBtn.addEventListener('click', async () => {
     }
 
     const numQuestions = parseInt(DOM.numQuestions.value);
+    const difficulty = DOM.difficulty.value;
     const language = DOM.language.value;
 
     const response = await fetch('/api/generate-quiz', {
@@ -158,6 +161,7 @@ DOM.generateBtn.addEventListener('click', async () => {
       body: JSON.stringify({
         text: state.fileText.substring(0, 30000),
         numQuestions,
+        difficulty,
         language,
       }),
     });
@@ -331,6 +335,88 @@ DOM.reviewBtn.addEventListener('click', () => {
       </div>
     `;
   }).join('');
+});
+
+// Download PDF
+DOM.downloadPdfBtn.addEventListener('click', async () => {
+  const { jsPDF } = window.jspdf;
+  const questions = state.quiz.questions;
+  const title = state.quiz.title || 'Quiz';
+  const isEnglish = DOM.language.value === 'english';
+
+  let correct = 0;
+  questions.forEach((q, i) => {
+    if (state.answers[i] === q.correctAnswer) correct++;
+  });
+
+  const wrapper = document.createElement('div');
+  wrapper.id = 'pdf-export';
+  wrapper.style.cssText = `position:fixed;left:-9999px;top:0;width:800px;background:#fff;padding:48px;font-family:'Cairo',sans-serif;direction:${isEnglish ? 'ltr' : 'rtl'};text-align:${isEnglish ? 'left' : 'right'}`;
+  wrapper.innerHTML = `
+    <div style="text-align:center;margin-bottom:32px;border-bottom:2px solid #f59e0b;padding-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:4px">
+        <svg width="20" height="20" viewBox="0 0 20 20"><rect width="20" height="20" rx="4" fill="#f59e0b"/><path d="M5 10l4 4 6-6" stroke="#000" stroke-width="2" fill="none"/></svg>
+        <span style="font-size:18px;font-weight:700;color:#111">QuizMind</span>
+      </div>
+      <h1 style="font-size:22px;font-weight:700;color:#111;margin:8px 0">${title}</h1>
+      <p style="color:#666;font-size:14px">النتيجة: ${correct}/${questions.length} — ${Math.round((correct / questions.length) * 100)}%</p>
+      <p style="color:#999;font-size:12px">${new Date().toLocaleDateString('ar-SA')}</p>
+    </div>
+    ${questions.map((q, i) => {
+      const isCorrect = state.answers[i] === q.correctAnswer;
+      const userAnswer = state.answers[i];
+      const userLabel = window._labels[userAnswer] ?? '—';
+      const correctLabel = window._labels[q.correctAnswer];
+      return `
+        <div style="margin-bottom:20px;padding:12px 16px;border:1px solid #e0e0e0;border-radius:8px;${!isCorrect ? 'background:#fef2f2' : 'background:#f0fdf4'}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-weight:600;color:${isCorrect ? '#22c55e' : '#ef4444'};font-size:12px">
+              ${isCorrect ? '✓ صحيح' : '✗ خطأ'}
+            </span>
+            <span style="color:#999;font-size:11px">سؤال ${i + 1}</span>
+          </div>
+          <p style="font-weight:600;color:#111;margin:0 0 8px;font-size:14px">${q.question}</p>
+          <div style="font-size:13px;color:#333;line-height:1.6">
+            <span style="color:#666">إجابتك:</span> ${userLabel}
+            ${!isCorrect ? `<span style="color:#666;margin-right:12px">الإجابة الصحيحة:</span> ${correctLabel}` : ''}
+          </div>
+          ${q.explanation ? `<div style="margin-top:8px;padding:8px 12px;background:#f5f5f5;border-radius:6px;font-size:12px;color:#555"><strong style="color:#f59e0b">شرح:</strong> ${q.explanation}</div>` : ''}
+        </div>
+      `;
+    }).join('')}
+    <div style="text-align:center;margin-top:32px;padding-top:16px;border-top:1px solid #e0e0e0;color:#999;font-size:11px">
+      QuizMind &mdash; تم الإنشاء في ${new Date().toLocaleDateString('ar-SA')}
+    </div>
+  `;
+  document.body.appendChild(wrapper);
+
+  try {
+    const canvas = await html2canvas(wrapper, { scale: 1, useCORS: true, backgroundColor: '#ffffff' });
+    const imgData = canvas.toDataURL('image/jpeg', 0.7);
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+    let heightLeft = pdfHeight;
+    let position = 0;
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+    heightLeft -= pageHeight;
+
+    while (heightLeft > 0) {
+      position -= pageHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+      heightLeft -= pageHeight;
+    }
+
+    pdf.save(`QuizMind-${title.substring(0, 30).replace(/[^a-zA-Z0-9_\-\u0600-\u06FF]/g, '')}.pdf`);
+  } catch (err) {
+    alert('حدث خطأ أثناء إنشاء PDF');
+  } finally {
+    wrapper.remove();
+  }
 });
 
 // New Quiz
