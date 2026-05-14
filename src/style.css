@@ -567,7 +567,7 @@ body {
   background: var(--surface-hover);
 }
 
-.option-item input[type="radio"]:checked + .option-label {
+.option-item input[type="radio"]:where(:checked) + .option-label {
   border-color: var(--accent);
   background: var(--accent-subtle);
 }
@@ -587,7 +587,7 @@ body {
   transition: var(--transition);
 }
 
-.option-item input[type="radio"]:checked + .option-label .option-indicator {
+.option-item input[type="radio"]:where(:checked) + .option-label .option-indicator {
   border-color: var(--accent);
   background: var(--accent);
   color: #0a0a0a;
@@ -754,7 +754,7 @@ body {
   cursor: default;
 }
 
-.review-card .option-item input[type="radio"]:checked + .option-label {
+.review-card .option-item input[type="radio"]:where(:checked) + .option-label {
   background: transparent;
 }
 
@@ -1026,7 +1026,7 @@ body {
   filter: drop-shadow(0 0 16px var(--accent-glow));
 }
 
-[data-theme="light"] .review-card .option-item input[type="radio"]:checked + .option-label {
+[data-theme="light"] .review-card .option-item input[type="radio"]:where(:checked) + .option-label {
   background: transparent;
 }
 
