@@ -20,6 +20,7 @@ const DOM = {
   numQuestions: document.getElementById('numQuestions'),
   difficulty: document.getElementById('difficulty'),
   language: document.getElementById('language'),
+  practiceMode: document.getElementById('practiceMode'),
 
   uploadSection: document.getElementById('uploadSection'),
   loadingSection: document.getElementById('loadingSection'),
@@ -373,14 +374,19 @@ function showQuestion(index) {
 
   const q = questions[index];
   const answered = state.answers[index] !== null && state.answers[index] !== undefined;
+  const practice = DOM.practiceMode?.checked;
 
   DOM.questionsContainer.innerHTML = `
     <div class="question-card">
       <div class="question-number">سؤال ${index + 1}</div>
       <div class="question-text">${q.question}</div>
       <div class="options-list">
-        ${q.options.map((opt, i) => `
-          <div class="option-item ${answered ? 'disabled' : ''}">
+        ${q.options.map((opt, i) => {
+          const correct = answered && i === q.correctAnswer;
+          const wrong = answered && state.answers[index] === i && i !== q.correctAnswer;
+          const cls = answered ? 'disabled' + (practice ? (correct ? ' correct' : wrong ? ' wrong' : '') : '') : '';
+          return `
+          <div class="option-item${cls}">
             <input type="radio" name="q${index}" id="q${index}o${i}" value="${i}"
               ${state.answers[index] === i ? 'checked' : ''} ${answered ? 'disabled' : ''} />
             <label class="option-label" for="q${index}o${i}">
@@ -388,8 +394,9 @@ function showQuestion(index) {
               <span class="option-text">${opt}</span>
             </label>
           </div>
-        `).join('')}
+        `}).join('')}
       </div>
+      ${answered && practice && q.explanation ? `<div class="explanation-box"><strong>شرح:</strong> ${q.explanation}</div>` : ''}
     </div>
   `;
 
@@ -397,6 +404,7 @@ function showQuestion(index) {
     DOM.questionsContainer.querySelectorAll('input[type="radio"]').forEach((input) => {
       input.addEventListener('change', (e) => {
         state.answers[index] = parseInt(e.target.value);
+        if (practice) showQuestion(index);
       });
     });
   }
@@ -459,10 +467,12 @@ function showResults() {
   stopTimer();
 
   const questions = state.quiz.questions;
-  const unanswered = state.answers.some((a) => a === null || a === undefined);
-  if (unanswered) {
-    const confirmed = confirm('هناك أسئلة لم تجب عليها. هل تريد إنهاء الامتحان؟');
-    if (!confirmed) { startTimer(questions.length); return; }
+  if (!DOM.practiceMode?.checked) {
+    const unanswered = state.answers.some((a) => a === null || a === undefined);
+    if (unanswered) {
+      const confirmed = confirm('هناك أسئلة لم تجب عليها. هل تريد إنهاء الامتحان؟');
+      if (!confirmed) { startTimer(questions.length); return; }
+    }
   }
 
   let correct = 0;
