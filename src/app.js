@@ -385,7 +385,7 @@ function showQuestion(index) {
         ${q.options.map((opt, i) => {
           const correct = answered && i === q.correctAnswer;
           const wrong = answered && state.answers[index] === i && i !== q.correctAnswer;
-          const cls = answered ? 'disabled' + (practice ? (correct ? ' correct' : wrong ? ' wrong' : '') : '') : '';
+          const cls = answered ? ' disabled' + (practice ? (correct ? ' correct' : wrong ? ' wrong' : '') : '') : '';
           return `
           <div class="option-item${cls}">
             <input type="radio" name="q${index}" id="q${index}o${i}" value="${i}"
