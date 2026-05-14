@@ -17,7 +17,7 @@ export const handler = async (event) => {
   if (!contentType.includes('application/json')) return { statusCode: 415, headers, body: JSON.stringify({ error: 'Unsupported content type' }) };
 
   try {
-    const { text, numQuestions = 5, difficulty = 'medium', language = 'arabic' } = JSON.parse(event.body);
+    const { text, numQuestions = 5, quizType = 'mcq', difficulty = 'medium', language = 'arabic' } = JSON.parse(event.body);
 
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid or empty text' }) };
@@ -26,17 +26,26 @@ export const handler = async (event) => {
     const difficultyHint = { easy: 'basic recall', medium: 'comprehension', hard: 'analysis' };
     const truncated = text.substring(0, 12000);
 
-    const prompt = `Create a ${language} quiz with ${numQuestions} multiple-choice questions from this text. Difficulty: ${difficultyHint[difficulty] || 'comprehension'}.
+    const isFill = quizType === 'fill';
 
-    Rules:
-    - Each question: 4 options, exactly one correct
-    - Include a brief explanation
-    - Return ONLY valid JSON, no markdown, no code fences
+    const formatJSON = isFill
+      ? `{"title":"...","questions":[{"question":"The capital of ___ is Paris.","answer":"France","explanation":"..."}]}`
+      : `{"title":"...","questions":[{"question":"...","options":["A","B","C","D"],"correctAnswer":0,"explanation":"..."}]}`;
 
-    Format: {"title":"...","questions":[{"question":"...","options":["A","B","C","D"],"correctAnswer":0,"explanation":"..."}]}
+    const rules = isFill
+      ? 'Each question has a blank (___) and the learner fills the missing word/phrase. Provide the single correct answer.'
+      : 'Each question: 4 options, exactly one correct.';
 
-    Text:
-    ${truncated}`;
+    const prompt = `Create a ${language} ${isFill ? 'fill-in-the-blank' : 'multiple-choice'} quiz with ${numQuestions} questions from this text. Difficulty: ${difficultyHint[difficulty] || 'comprehension'}.
+
+Rules: ${rules}
+Include a brief explanation for each.
+Return ONLY valid JSON, no markdown, no code fences.
+
+Format: ${formatJSON}
+
+Text:
+${truncated}`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
@@ -79,6 +88,9 @@ export const handler = async (event) => {
     } catch {
       return { statusCode: 502, headers, body: JSON.stringify({ error: 'Failed to parse quiz JSON', raw: content }) };
     }
+
+    // indicate quiz type in response
+    quiz._type = isFill ? 'fill' : 'mcq';
 
     return { statusCode: 200, headers, body: JSON.stringify(quiz) };
   } catch (error) {

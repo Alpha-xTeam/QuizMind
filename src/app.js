@@ -2,9 +2,11 @@ const state = {
   file: null,
   fileText: '',
   quiz: null,
+  quizType: 'mcq',
   currentQuestion: 0,
   answers: [],
   reviewed: false,
+  isShared: false,
 };
 
 const DOM = {
@@ -16,6 +18,7 @@ const DOM = {
   fileSize: document.getElementById('fileSize'),
   removeFileBtn: document.getElementById('removeFileBtn'),
   numQuestions: document.getElementById('numQuestions'),
+  quizType: document.getElementById('quizType'),
   difficulty: document.getElementById('difficulty'),
   language: document.getElementById('language'),
   practiceMode: document.getElementById('practiceMode'),
@@ -39,7 +42,8 @@ const DOM = {
   scoreMessage: document.getElementById('scoreMessage'),
   scoreDetails: document.getElementById('scoreDetails'),
   reviewBtn: document.getElementById('reviewBtn'),
-  shareBtn: document.getElementById('shareBtn'),
+  shareResultBtn: document.getElementById('shareResultBtn'),
+  shareQuizBtn: document.getElementById('shareQuizBtn'),
   downloadPdfBtn: document.getElementById('downloadPdfBtn'),
   newQuizBtn: document.getElementById('newQuizBtn'),
   reviewSection: document.getElementById('reviewSection'),
@@ -55,6 +59,8 @@ const DOM = {
   clearHistoryBtn: document.getElementById('clearHistoryBtn'),
   backFromHistoryBtn: document.getElementById('backFromHistoryBtn'),
 };
+
+// ─── Labels ─────────────────────────────────────────
 
 const LABELS_AR = ['أ', 'ب', 'ج', 'د'];
 const LABELS_EN = ['A', 'B', 'C', 'D'];
@@ -266,6 +272,7 @@ DOM.generateBtn.addEventListener('click', async () => {
     }
 
     const numQuestions = parseInt(DOM.numQuestions.value);
+    const quizType = DOM.quizType.value;
     const difficulty = DOM.difficulty.value;
     const language = DOM.language.value;
 
@@ -275,6 +282,7 @@ DOM.generateBtn.addEventListener('click', async () => {
       body: JSON.stringify({
         text: state.fileText.substring(0, 30000),
         numQuestions,
+        quizType,
         difficulty,
         language,
       }),
@@ -297,6 +305,7 @@ DOM.generateBtn.addEventListener('click', async () => {
     }
 
     state.quiz = await response.json();
+    state.quizType = quizType;
     state.answers = new Array(state.quiz.questions.length).fill(null);
     state.currentQuestion = 0;
 
@@ -318,7 +327,8 @@ DOM.generateBtn.addEventListener('click', async () => {
 
 function renderQuiz(isEnglish) {
   window._labels = isEnglish ? LABELS_EN : LABELS_AR;
-  DOM.quizTitle.textContent = state.quiz.title || 'الامتحان';
+  const title = state.isShared ? `🎯 ${state.quiz.title || 'امتحان صديق'}` : (state.quiz.title || 'الامتحان');
+  DOM.quizTitle.textContent = title;
   DOM.totalQuestions.textContent = state.quiz.questions.length;
   DOM.submitBtn.hidden = true;
   showQuestion(0);
@@ -339,37 +349,80 @@ function showQuestion(index) {
   const answered = state.answers[index] !== null && state.answers[index] !== undefined;
   const practice = DOM.practiceMode?.checked;
 
-  DOM.questionsContainer.innerHTML = `
-    <div class="question-card">
-      <div class="question-number">سؤال ${index + 1}</div>
-      <div class="question-text">${q.question}</div>
-      <div class="options-list">
-        ${q.options.map((opt, i) => {
-          const correct = answered && i === q.correctAnswer;
-          const wrong = answered && state.answers[index] === i && i !== q.correctAnswer;
-          const cls = answered ? ' disabled' + (practice ? (correct ? ' correct' : wrong ? ' wrong' : '') : '') : '';
-          return `
-          <div class="option-item${cls}">
-            <input type="radio" name="q${index}" id="q${index}o${i}" value="${i}"
-              ${state.answers[index] === i ? 'checked' : ''} ${answered ? 'disabled' : ''} />
-            <label class="option-label" for="q${index}o${i}">
-              <span class="option-indicator">${window._labels[i]}</span>
-              <span class="option-text">${opt}</span>
-            </label>
+  if (state.quizType === 'fill') {
+    const isCorrect = answered && state.answers[index]?.trim().toLowerCase() === (q.answer || '').trim().toLowerCase();
+    DOM.questionsContainer.innerHTML = `
+      <div class="question-card">
+        <div class="question-number">سؤال ${index + 1}</div>
+        <div class="question-text">${q.question.replace(/___+/g, '<span style="display:inline-block;min-width:100px;border-bottom:2px dashed var(--accent);margin:0 6px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>')}</div>
+        ${!answered ? `
+          <div class="options-list">
+            <input type="text" id="fillInput" placeholder="أكتب الإجابة هنا..." style="width:100%;padding:16px 18px;border-radius:18px;border:1.5px solid var(--border);background:#111114;color:var(--text);font-family:inherit;font-size:1rem;outline:none;transition:var(--transition)" />
           </div>
-        `}).join('')}
+        ` : `
+          <div class="options-list">
+            <div class="option-item disabled ${isCorrect ? 'correct' : 'wrong'}">
+              <label class="option-label">
+                <span class="option-indicator">${isCorrect ? '✓' : '✗'}</span>
+                <span class="option-text">${state.answers[index]} ${!isCorrect ? `← (الإجابة الصحيحة: ${q.answer})` : ''}</span>
+              </label>
+            </div>
+          </div>
+        `}
+        ${answered && practice && q.explanation ? `<div class="explanation-box"><strong>شرح:</strong> ${q.explanation}</div>` : ''}
       </div>
-      ${answered && practice && q.explanation ? `<div class="explanation-box"><strong>شرح:</strong> ${q.explanation}</div>` : ''}
-    </div>
-  `;
+    `;
 
-  if (!answered) {
-    DOM.questionsContainer.querySelectorAll('input[type="radio"]').forEach((input) => {
-      input.addEventListener('change', (e) => {
-        state.answers[index] = parseInt(e.target.value);
-        if (practice) showQuestion(index);
+    if (!answered) {
+      const input = document.getElementById('fillInput');
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          state.answers[index] = input.value.trim();
+          if (practice) showQuestion(index);
+        }
       });
-    });
+      input.addEventListener('blur', () => {
+        if (input.value.trim()) {
+          state.answers[index] = input.value.trim();
+          if (practice) showQuestion(index);
+        }
+      });
+      setTimeout(() => input.focus(), 100);
+    }
+  } else {
+    // MCQ
+    DOM.questionsContainer.innerHTML = `
+      <div class="question-card">
+        <div class="question-number">سؤال ${index + 1}</div>
+        <div class="question-text">${q.question}</div>
+        <div class="options-list">
+          ${q.options.map((opt, i) => {
+            const correct = answered && i === q.correctAnswer;
+            const wrong = answered && state.answers[index] === i && i !== q.correctAnswer;
+            const cls = answered ? ' disabled' + (practice ? (correct ? ' correct' : wrong ? ' wrong' : '') : '') : '';
+            return `
+            <div class="option-item${cls}">
+              <input type="radio" name="q${index}" id="q${index}o${i}" value="${i}"
+                ${state.answers[index] === i ? 'checked' : ''} ${answered ? 'disabled' : ''} />
+              <label class="option-label" for="q${index}o${i}">
+                <span class="option-indicator">${window._labels[i]}</span>
+                <span class="option-text">${opt}</span>
+              </label>
+            </div>
+          `}).join('')}
+        </div>
+        ${answered && practice && q.explanation ? `<div class="explanation-box"><strong>شرح:</strong> ${q.explanation}</div>` : ''}
+      </div>
+    `;
+
+    if (!answered) {
+      DOM.questionsContainer.querySelectorAll('input[type="radio"]').forEach((input) => {
+        input.addEventListener('change', (e) => {
+          state.answers[index] = parseInt(e.target.value);
+          if (practice) showQuestion(index);
+        });
+      });
+    }
   }
 }
 
@@ -397,7 +450,7 @@ document.addEventListener('keydown', (e) => {
   const q = state.quiz.questions[idx];
   const answered = state.answers[idx] !== null && state.answers[idx] !== undefined;
 
-  if (e.key >= '1' && e.key <= '4' && !answered) {
+  if (state.quizType !== 'fill' && e.key >= '1' && e.key <= '4' && !answered) {
     const i = parseInt(e.key) - 1;
     if (i < q.options.length) {
       state.answers[idx] = i;
@@ -439,7 +492,13 @@ function showResults() {
 
   let correct = 0;
   questions.forEach((q, i) => {
-    if (state.answers[i] === q.correctAnswer) correct++;
+    if (state.quizType === 'fill') {
+      const userAns = (state.answers[i] || '').trim().toLowerCase();
+      const correctAns = (q.answer || '').trim().toLowerCase();
+      if (userAns === correctAns) correct++;
+    } else {
+      if (state.answers[i] === q.correctAnswer) correct++;
+    }
   });
 
   const score = Math.round((correct / questions.length) * 100);
@@ -479,7 +538,8 @@ function showResults() {
 
 // ─── Share ──────────────────────────────────────────
 
-DOM.shareBtn.addEventListener('click', () => {
+// Share result (old shareBtn functionality)
+DOM.shareResultBtn.addEventListener('click', () => {
   const questions = state.quiz.questions;
   let correct = 0;
   questions.forEach((q, i) => {
@@ -502,6 +562,44 @@ DOM.shareBtn.addEventListener('click', () => {
     });
   } else {
     fallbackCopy(text);
+  }
+});
+
+// Share quiz with friend
+DOM.shareQuizBtn.addEventListener('click', () => {
+  try {
+    // Create a minimal quiz data without answers
+    const shareData = {
+      t: state.quiz.title,
+      q: state.quiz.questions.map(q => ({
+        q: q.question,
+        o: q.options,
+        a: q.correctAnswer,
+        e: q.explanation || ''
+      })),
+      d: DOM.difficulty.value,
+      l: DOM.language.value,
+      tp: state.quizType
+    };
+
+    // Encode to base64
+    const encoded = btoa(encodeURIComponent(JSON.stringify(shareData)));
+    const shareUrl = `${window.location.origin}${window.location.pathname}#quiz=${encoded}`;
+
+    // Copy to clipboard
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        showSnackbar('تم نسخ رابط الامتحان - أرسله لصديقك! 📤');
+      }).catch(() => {
+        fallbackCopy(shareUrl);
+        showSnackbar('تم نسخ رابط الامتحان - أرسله لصديقك! 📤');
+      });
+    } else {
+      fallbackCopy(shareUrl);
+      showSnackbar('تم نسخ رابط الامتحان - أرسله لصديقك! 📤');
+    }
+  } catch (err) {
+    showSnackbar('حدث خطأ في إنشاء الرابط');
   }
 });
 
@@ -530,9 +628,34 @@ DOM.reviewBtn.addEventListener('click', () => {
 
   const questions = state.quiz.questions;
   DOM.reviewContainer.innerHTML = questions.map((q, i) => {
+    if (state.quizType === 'fill') {
+      const userAns = (state.answers[i] || '').trim().toLowerCase();
+      const correctAns = (q.answer || '').trim().toLowerCase();
+      const isCorrect = userAns === correctAns;
+
+      return `
+        <div class="review-card">
+          <div class="review-status ${isCorrect ? 'correct' : 'wrong'}">
+            ${isCorrect ? '✓ صحيح' : '✗ خطأ'}
+            ${!isCorrect && state.answers[i] ? `(إجابتك: ${state.answers[i]})` : ''}
+            ${!state.answers[i] ? '(لم تجب)' : ''}
+          </div>
+          <div class="question-text">${q.question}</div>
+          <div class="options-list">
+            <div class="option-item disabled ${isCorrect ? 'correct' : 'wrong'}">
+              <label class="option-label">
+                <span class="option-indicator">${isCorrect ? '✓' : '✗'}</span>
+                <span class="option-text">${state.answers[i] || '—'} ${!isCorrect ? `← الإجابة الصحيحة: ${q.answer}` : ''}</span>
+              </label>
+            </div>
+          </div>
+          ${q.explanation ? `<div class="explanation-box"><strong>شرح:</strong> ${q.explanation}</div>` : ''}
+        </div>
+      `;
+    }
+
     const isCorrect = state.answers[i] === q.correctAnswer;
     const userAnswer = state.answers[i];
-
     return `
       <div class="review-card">
         <div class="review-status ${isCorrect ? 'correct' : 'wrong'}">
@@ -568,7 +691,13 @@ DOM.downloadPdfBtn.addEventListener('click', async () => {
 
   let correct = 0;
   questions.forEach((q, i) => {
-    if (state.answers[i] === q.correctAnswer) correct++;
+    if (state.quizType === 'fill') {
+      const ua = (state.answers[i] || '').trim().toLowerCase();
+      const ca = (q.answer || '').trim().toLowerCase();
+      if (ua === ca) correct++;
+    } else {
+      if (state.answers[i] === q.correctAnswer) correct++;
+    }
   });
 
   const wrapper = document.createElement('div');
@@ -645,6 +774,7 @@ DOM.newQuizBtn.addEventListener('click', () => {
   state.answers = [];
   state.currentQuestion = 0;
   state.reviewed = false;
+  state.isShared = false;
 
   DOM.resultsSection.hidden = true;
   DOM.reviewSection.hidden = true;
@@ -654,3 +784,58 @@ DOM.newQuizBtn.addEventListener('click', () => {
   DOM.scoreCircle.style.strokeDashoffset = 314;
   resetFile();
 });
+
+// ─── Handle Shared Quiz Link ──────────────────────────
+
+function checkForSharedQuiz() {
+  const hash = window.location.hash;
+  if (hash.startsWith('#quiz=')) {
+    try {
+      const encoded = hash.substring(6);
+      const decoded = JSON.parse(decodeURIComponent(atob(encoded)));
+
+      // Create quiz object from shared data
+      state.quiz = {
+        title: decoded.t,
+        questions: decoded.q.map((q, i) => ({
+          question: q.q,
+          options: q.o,
+          correctAnswer: q.a,
+          explanation: q.e
+        }))
+      };
+      state.quizType = decoded.tp || 'mcq';
+      state.answers = new Array(state.quiz.questions.length).fill(null);
+      state.currentQuestion = 0;
+      state.isShared = true;
+
+      // Apply language direction
+      if (decoded.l === 'english') {
+        DOM.quizSection.classList.add('dir-ltr');
+      } else {
+        DOM.quizSection.classList.remove('dir-ltr');
+      }
+
+      // Hide upload, show quiz
+      DOM.uploadSection.hidden = true;
+      DOM.loadingSection.hidden = true;
+      DOM.historySection.hidden = true;
+      renderQuiz(decoded.l === 'english');
+      DOM.quizSection.hidden = false;
+
+      // Clean URL
+      history.replaceState(null, '', window.location.pathname);
+
+      showSnackbar('🧪 امتحان جديد - جاهز للبدء!');
+    } catch (err) {
+      console.error('Error loading shared quiz:', err);
+      showSnackbar('رابط الامتحان غير صالح');
+    }
+  }
+}
+
+// Check on page load
+checkForSharedQuiz();
+
+// Also check on hash change
+window.addEventListener('hashchange', checkForSharedQuiz);
