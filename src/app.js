@@ -284,8 +284,19 @@ DOM.generateBtn.addEventListener('click', async () => {
     });
 
     if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || 'Failed');
+      let msg;
+      try {
+        const err = await response.json();
+        msg = err.error || 'خطأ في الخادم';
+      } catch {
+        const text = await response.text();
+        if (text.includes('<html') || text.includes('<HTML')) {
+          msg = 'انتهت مهلة الطلب. جرب عدد أسئلة أقل.';
+        } else {
+          msg = text.substring(0, 100) || 'خطأ غير معروف';
+        }
+      }
+      throw new Error(msg);
     }
 
     state.quiz = await response.json();

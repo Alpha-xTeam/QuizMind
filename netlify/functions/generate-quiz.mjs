@@ -1,6 +1,8 @@
 const MISTRAL_API_KEY = 'DMJnqoIbgQcpe5GxmD2qCdt2dLs61sQA';
 const MISTRAL_API_URL = 'https://api.mistral.ai/v1/chat/completions';
 
+const TIMEOUT_MS = 9000; // 9s — just under Netlify free tier limit
+
 export const handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -14,22 +16,14 @@ export const handler = async (event) => {
   }
 
   if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ error: 'Method not allowed' }),
-    };
+    return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
   try {
     const { text, numQuestions = 5, difficulty = 'medium', language = 'arabic' } = JSON.parse(event.body);
 
     if (!text || text.trim().length === 0) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'No lecture text provided' }),
-      };
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'No lecture text provided' }) };
     }
 
     const difficultyGuide = {
@@ -37,6 +31,10 @@ export const handler = async (event) => {
       medium: 'Ask comprehension questions: require understanding of the material, ability to explain concepts in own words, and connect related ideas. Options should be plausible but distinguishable.',
       hard: 'Ask analysis and application questions: require critical thinking, synthesizing multiple concepts, applying knowledge to new scenarios, and evaluating ideas. Options should be tricky and closely related.',
     };
+
+    // Reduce input text for many questions to keep response fast
+    const maxInput = numQuestions <= 5 ? 25000 : numQuestions <= 10 ? 15000 : 8000;
+    const truncated = text.substring(0, maxInput);
 
     const prompt = `You are a quiz generator. Based on the following lecture content, create a quiz with exactly ${numQuestions} multiple-choice questions.
 
@@ -59,43 +57,50 @@ Difficulty level: ${difficulty}
 Difficulty instructions: ${difficultyGuide[difficulty] || difficultyGuide.medium}
 Language: ${language}
 Lecture content:
-${text.substring(0, 30000)}`;
+${truncated}`;
 
-    const response = await fetch(MISTRAL_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${MISTRAL_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'mistral-large-latest',
-        messages: [
-          { role: 'system', content: 'You are a quiz generator that outputs only valid JSON.' },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.7,
-        max_tokens: 4096,
-      }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    let response;
+    try {
+      response = await fetch(MISTRAL_API_URL, {
+        signal: controller.signal,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${MISTRAL_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'mistral-large-latest',
+          messages: [
+            { role: 'system', content: 'You are a quiz generator that outputs only valid JSON.' },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.7,
+          max_tokens: numQuestions <= 5 ? 4096 : numQuestions <= 10 ? 6144 : 8192,
+        }),
+      });
+    } catch (fetchError) {
+      clearTimeout(timeout);
+      if (fetchError.name === 'AbortError') {
+        return { statusCode: 504, headers, body: JSON.stringify({ error: 'الطلب استغرق وقتًا طويلاً. جرب عدد أسئلة أقل.' }) };
+      }
+      throw fetchError;
+    }
+
+    clearTimeout(timeout);
 
     if (!response.ok) {
       const errorText = await response.text();
-      return {
-        statusCode: response.status,
-        headers,
-        body: JSON.stringify({ error: `Mistral API error: ${errorText}` }),
-      };
+      return { statusCode: response.status, headers, body: JSON.stringify({ error: `Mistral API error: ${errorText}` }) };
     }
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) {
-      return {
-        statusCode: 502,
-        headers,
-        body: JSON.stringify({ error: 'No response content from Mistral' }),
-      };
+      return { statusCode: 502, headers, body: JSON.stringify({ error: 'No response content from Mistral' }) };
     }
 
     let quiz;
@@ -106,23 +111,11 @@ ${text.substring(0, 30000)}`;
         .trim();
       quiz = JSON.parse(cleaned);
     } catch {
-      return {
-        statusCode: 502,
-        headers,
-        body: JSON.stringify({ error: 'Failed to parse quiz JSON from AI response', raw: content }),
-      };
+      return { statusCode: 502, headers, body: JSON.stringify({ error: 'Failed to parse quiz JSON from AI response', raw: content }) };
     }
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify(quiz),
-    };
+    return { statusCode: 200, headers, body: JSON.stringify(quiz) };
   } catch (error) {
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: error.message }),
-    };
+    return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) };
   }
 };
