@@ -211,7 +211,8 @@ function handleFile(file) {
     return;
   }
   const ext = file.name.split('.').pop().toLowerCase();
-  if (!['pdf', 'txt'].includes(ext)) {
+  const allowedTypes = ['application/pdf', 'text/plain'];
+  if (!['pdf', 'txt'].includes(ext) || (!allowedTypes.includes(file.type) && file.type !== '')) {
     alert('يرجى رفع ملف PDF أو TXT فقط');
     return;
   }

@@ -1,4 +1,4 @@
-const MISTRAL_API_KEY = 'DMJnqoIbgQcpe5GxmD2qCdt2dLs61sQA';
+const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY;
 const MISTRAL_API_URL = 'https://api.mistral.ai/v1/chat/completions';
 
 const TIMEOUT_MS = 7000; // 7s — stay under Netlify free tier 10s limit
@@ -19,11 +19,32 @@ export const handler = async (event) => {
     return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
+  if (!MISTRAL_API_KEY) {
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Server configuration error' }) };
+  }
+
+  if (!event.body || event.body.length > 500000) {
+    return { statusCode: 413, headers, body: JSON.stringify({ error: 'Request too large' }) };
+  }
+
+  const contentType = event.headers['content-type'] || '';
+  if (!contentType.includes('application/json')) {
+    return { statusCode: 415, headers, body: JSON.stringify({ error: 'Unsupported content type' }) };
+  }
+
   try {
     const { text, numQuestions = 5, difficulty = 'medium', language = 'arabic' } = JSON.parse(event.body);
 
-    if (!text || text.trim().length === 0) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'No lecture text provided' }) };
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid or empty text' }) };
+    }
+
+    if (text.length > 50000) {
+      return { statusCode: 413, headers, body: JSON.stringify({ error: 'Text too large' }) };
+    }
+
+    if (/[\x00-\x08\x0E-\x1F]/.test(text)) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid content' }) };
     }
 
     const difficultyGuide = {
