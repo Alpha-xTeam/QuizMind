@@ -1074,30 +1074,6 @@ body {
   gap: 10px;
 }
 
-.timer-badge {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  direction: ltr;
-  unicode-bidi: bidi-override;
-}
-
-.timer-badge.warning {
-  color: var(--error);
-}
-
-.timer-badge.warning svg {
-  animation: pulse 1s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
 /* History Section */
 .history-section {
   animation: fadeIn 0.3s ease;

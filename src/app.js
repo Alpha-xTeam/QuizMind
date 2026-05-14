@@ -5,8 +5,6 @@ const state = {
   currentQuestion: 0,
   answers: [],
   reviewed: false,
-  timer: null,
-  timeLeft: 0,
 };
 
 const DOM = {
@@ -35,9 +33,6 @@ const DOM = {
   prevBtn: document.getElementById('prevBtn'),
   nextBtn: document.getElementById('nextBtn'),
   submitBtn: document.getElementById('submitBtn'),
-
-  timerBadge: document.getElementById('timerBadge'),
-  timerDisplay: document.getElementById('timerDisplay'),
 
   scoreNumber: document.getElementById('scoreNumber'),
   scoreCircle: document.getElementById('scoreCircle'),
@@ -310,47 +305,14 @@ DOM.generateBtn.addEventListener('click', async () => {
     DOM.quizSection.classList.toggle('dir-ltr', isEnglish);
     renderQuiz(isEnglish);
     DOM.quizSection.hidden = false;
+    DOM.quizSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    startTimer(state.quiz.questions.length);
   } catch (error) {
     DOM.loadingSection.hidden = true;
     DOM.uploadSection.hidden = false;
     alert('حدث خطأ: ' + error.message);
   }
 });
-
-// ─── Timer ──────────────────────────────────────────
-
-function startTimer(questionCount) {
-  stopTimer();
-  state.timeLeft = questionCount * 30;
-  DOM.timerBadge.hidden = false;
-  DOM.timerBadge.classList.remove('warning');
-  renderTimer();
-  state.timer = setInterval(() => {
-    state.timeLeft--;
-    renderTimer();
-    if (state.timeLeft <= 10) DOM.timerBadge.classList.add('warning');
-    if (state.timeLeft <= 0) {
-      stopTimer();
-      showResults();
-    }
-  }, 1000);
-}
-
-function stopTimer() {
-  if (state.timer) {
-    clearInterval(state.timer);
-    state.timer = null;
-  }
-  DOM.timerBadge.hidden = true;
-}
-
-function renderTimer() {
-  const m = String(Math.floor(state.timeLeft / 60)).padStart(2, '0');
-  const s = String(state.timeLeft % 60).padStart(2, '0');
-  DOM.timerDisplay.textContent = `${m}:${s}`;
-}
 
 // ─── Render quiz ────────────────────────────────────
 
@@ -465,14 +427,13 @@ document.addEventListener('keydown', (e) => {
 // ─── Results ────────────────────────────────────────
 
 function showResults() {
-  stopTimer();
 
   const questions = state.quiz.questions;
   if (!DOM.practiceMode?.checked) {
     const unanswered = state.answers.some((a) => a === null || a === undefined);
     if (unanswered) {
       const confirmed = confirm('هناك أسئلة لم تجب عليها. هل تريد إنهاء الامتحان؟');
-      if (!confirmed) { startTimer(questions.length); return; }
+      if (!confirmed) { return; }
     }
   }
 
@@ -492,6 +453,7 @@ function showResults() {
 
   DOM.quizSection.hidden = true;
   DOM.resultsSection.hidden = false;
+  DOM.resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const circumference = 314;
   setTimeout(() => {
@@ -679,7 +641,6 @@ DOM.downloadPdfBtn.addEventListener('click', async () => {
 // ─── New Quiz ───────────────────────────────────────
 
 DOM.newQuizBtn.addEventListener('click', () => {
-  stopTimer();
   state.quiz = null;
   state.answers = [];
   state.currentQuestion = 0;
