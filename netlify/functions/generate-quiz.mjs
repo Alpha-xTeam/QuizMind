@@ -1,7 +1,7 @@
 const MISTRAL_API_KEY = 'DMJnqoIbgQcpe5GxmD2qCdt2dLs61sQA';
 const MISTRAL_API_URL = 'https://api.mistral.ai/v1/chat/completions';
 
-const TIMEOUT_MS = 9000; // 9s — just under Netlify free tier limit
+const TIMEOUT_MS = 7000; // 7s — stay under Netlify free tier 10s limit
 
 export const handler = async (event) => {
   const headers = {
@@ -32,7 +32,7 @@ export const handler = async (event) => {
       hard: 'Ask analysis and application questions: require critical thinking, synthesizing multiple concepts, applying knowledge to new scenarios, and evaluating ideas. Options should be tricky and closely related.',
     };
 
-    const maxInput = 25000;
+    const maxInput = 12000;
     const truncated = text.substring(0, maxInput);
 
     const prompt = `You are a quiz generator. Based on the following lecture content, create a quiz with exactly ${numQuestions} multiple-choice questions.
@@ -71,13 +71,13 @@ ${truncated}`;
           'Authorization': `Bearer ${MISTRAL_API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'mistral-large-latest',
+          model: 'mistral-small-latest',
           messages: [
             { role: 'system', content: 'You are a quiz generator that outputs only valid JSON.' },
             { role: 'user', content: prompt },
           ],
           temperature: 0.7,
-          max_tokens: 4096,
+          max_tokens: 2048,
         }),
       });
     } catch (fetchError) {
