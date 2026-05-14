@@ -1,0 +1,13 @@
+{
+  "name": "lecture-quiz-generator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "netlify build"
+  },
+  "devDependencies": {
+    "netlify-cli": "^19.0.3"
+  }
+}

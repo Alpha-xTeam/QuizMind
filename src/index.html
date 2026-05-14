@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QuizMind - مولد الامتحانات الذكي</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <rect width="28" height="28" rx="6" fill="#f59e0b" />
+            <path d="M7 14L11 18L21 8" stroke="#0a0a0a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+        <div class="logo-text">
+          <h1>QuizMind</h1>
+          <span>مولد الامتحانات بالذكاء الاصطناعي</span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="upload-section" id="uploadSection">
+        <div class="hero-text">
+          <h2>حوّل محاضراتك إلى اختبارات</h2>
+          <p>ارفع ملف المحاضرة (PDF أو نص) ودع الذكاء الاصطناعي يصنع لك امتحاناً</p>
+        </div>
+
+        <div class="upload-zone" id="uploadZone">
+          <div class="upload-icon">
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+              <path d="M20 28V12M20 12L14 18M20 12L26 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M6 26V32C6 33.1046 6.89543 34 8 34H32C33.1046 34 34 33.1046 34 32V26" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </div>
+          <p class="upload-text">اسحب الملف وأفلته هنا أو <span class="browse-link">اختر ملف</span></p>
+          <p class="upload-hint">يدعم PDF و TXT - الحد الأقصى 10MB</p>
+          <input type="file" id="fileInput" accept=".pdf,.txt" hidden />
+        </div>
+
+        <div class="upload-right">
+          <div class="options-row">
+            <div class="option-group">
+              <label for="numQuestions">عدد الأسئلة:</label>
+              <select id="numQuestions">
+                <option value="3">3</option>
+                <option value="5" selected>5</option>
+                <option value="10">10</option>
+                <option value="15">15</option>
+              </select>
+            </div>
+            <div class="option-group">
+              <label for="language">لغة الامتحان:</label>
+              <select id="language">
+                <option value="arabic" selected>العربية</option>
+                <option value="english">English</option>
+              </select>
+            </div>
+          </div>
+
+          <button class="btn-primary" id="generateBtn" disabled>
+            توليد الامتحان
+          </button>
+        </div>
+
+        <div class="file-info" id="fileInfo" hidden>
+          <div class="file-info-card">
+            <div class="file-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M14 2H6C4.89543 2 4 2.89543 4 4V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V8L14 2Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M14 2V8H20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <div class="file-details">
+              <span class="file-name" id="fileName"></span>
+              <span class="file-size" id="fileSize"></span>
+            </div>
+            <button class="btn-remove" id="removeFileBtn">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="loading-section" id="loadingSection" hidden>
+        <div class="loading-card">
+          <div class="spinner">
+            <div class="spinner-ring"></div>
+          </div>
+          <h3>جاري تحليل المحاضرة...</h3>
+          <p>يقرأ الذكاء الاصطناعي المحتوى ويصمم الأسئلة</p>
+        </div>
+      </section>
+
+      <section class="quiz-section" id="quizSection" hidden>
+        <div class="quiz-header">
+          <div class="quiz-meta">
+            <h2 id="quizTitle">الامتحان</h2>
+            <div class="quiz-stats">
+              <span class="stat-badge" id="currentQuestion">1</span>
+              <span class="stat-sep">/</span>
+              <span class="stat-badge" id="totalQuestions">5</span>
+            </div>
+          </div>
+          <div class="quiz-progress-bar">
+            <div class="quiz-progress-fill" id="quizProgressFill"></div>
+          </div>
+        </div>
+
+        <div class="questions-container" id="questionsContainer"></div>
+
+        <div class="quiz-footer">
+          <button class="btn-secondary" id="prevBtn" hidden>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            السابق
+          </button>
+          <button class="btn-primary" id="nextBtn">
+            التالي
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+          <button class="btn-primary" id="submitBtn" hidden>
+            إنهاء الامتحان
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M3 8L6 11L13 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+        </div>
+      </section>
+
+      <section class="results-section" id="resultsSection" hidden>
+        <div class="results-card">
+          <div class="score-ring">
+            <svg width="120" height="120" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="50" stroke="#1f1f1f" stroke-width="8" fill="none" />
+              <circle id="scoreCircle" cx="60" cy="60" r="50" stroke="#f59e0b" stroke-width="8" fill="none" stroke-linecap="round"
+                stroke-dasharray="314" stroke-dashoffset="314" transform="rotate(-90 60 60)" />
+            </svg>
+            <div class="score-text">
+              <span class="score-number" id="scoreNumber">0</span>
+              <span class="score-label">%</span>
+            </div>
+          </div>
+          <div class="results-header">
+            <h2 id="scoreMessage">نتيجة ممتازة!</h2>
+            <p id="scoreDetails"></p>
+          </div>
+          <div class="results-actions">
+            <button class="btn-secondary" id="reviewBtn">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M1.5 8C1.5 8 4 3 8 3C12 3 14.5 8 14.5 8C14.5 8 12 13 8 13C4 13 1.5 8 1.5 8Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.5" />
+              </svg>
+              مراجعة الإجابات
+            </button>
+            <button class="btn-primary" id="newQuizBtn">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2V14M2 8H14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+              امتحان جديد
+            </button>
+          </div>
+        </div>
+
+        <div class="review-section" id="reviewSection" hidden>
+          <h3>مراجعة الإجابات</h3>
+          <div id="reviewContainer"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        <a href="#" class="footer-logo">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <rect width="16" height="16" rx="3" fill="#f59e0b"/>
+            <path d="M4 8l3 3 5-5" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          QuizMind
+        </a>
+        <div class="footer-divider"></div>
+        <span class="footer-text">مدعوم بـ Mistral AI</span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  </script>
+  <script src="app.js"></script>
+</body>
+</html>
