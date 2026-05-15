@@ -434,6 +434,7 @@ DOM.generateBtn.addEventListener('click', async () => {
     state.quizType = quizType;
     state.answers = new Array(state.quiz.questions.length).fill(null);
     state.currentQuestion = 0;
+    state.quizSharedId = null;
     incrementStats();
 
     DOM.loadingSection.hidden = true;
@@ -910,6 +911,7 @@ DOM.newQuizBtn.addEventListener('click', () => {
   state.currentQuestion = 0;
   state.reviewed = false;
   state.isShared = false;
+  state.quizSharedId = null;
 
   DOM.resultsSection.hidden = true;
   DOM.reviewSection.hidden = true;
