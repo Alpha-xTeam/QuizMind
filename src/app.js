@@ -69,15 +69,63 @@ const DOM = {
 const LABELS_AR = ['أ', 'ب', 'ج', 'د'];
 const LABELS_EN = ['A', 'B', 'C', 'D'];
 const HISTORY_KEY = 'quizmind_history';
+const SUPABASE_URL = 'https://xjdmfdawewcbikumcdrt.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZG1mZGF3ZXdjYmlrdW1jZHJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NTcwMDYsImV4cCI6MjA5NDQzMzAwNn0.u0hQ8yk4ZLslrp99QjmMrUl6Kz5fkfzjP_pWMhUbvLE';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 async function fetchStats() {
   try {
-    const res = await fetch('/api/db?type=stats');
-    if (!res.ok) return;
-    const data = await res.json();
-    if (DOM.totalExamsCount) {
-      DOM.totalExamsCount.textContent = data.total_exams || 0;
-    }
+    const { data } = await sb.from('app_stats').select('total_exams').eq('id', 'global').single();
+    if (data && DOM.totalExamsCount) DOM.totalExamsCount.textContent = data.total_exams || 0;
+  } catch {}
+}
+
+async function incrementStats() {
+  try {
+    const { data: current } = await sb.from('app_stats').select('total_exams').eq('id', 'global').single();
+    const newCount = (current?.total_exams ?? 0) + 1;
+    await sb.from('app_stats').update({ total_exams: newCount, updated_at: new Date().toISOString() }).eq('id', 'global');
+    if (DOM.totalExamsCount) DOM.totalExamsCount.textContent = newCount;
+  } catch {}
+}
+
+async function getHistory() {
+  try {
+    const { data } = await sb.from('quiz_results').select('*').order('created_at', { ascending: false }).limit(50);
+    if (!data) throw new Error();
+    return data.map(e => ({
+      title: e.title,
+      correct: e.correct_answers,
+      total: e.total_questions,
+      difficulty: e.difficulty,
+      date: new Date(e.created_at).getTime(),
+    }));
+  } catch {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
+    catch { return []; }
+  }
+}
+
+async function addHistory(entry) {
+  try {
+    await sb.from('quiz_results').insert({
+      title: entry.title || 'امتحان',
+      difficulty: entry.difficulty || 'medium',
+      language: 'arabic',
+      quiz_type: 'mcq',
+      total_questions: entry.total || 1,
+      correct_answers: entry.correct || 0,
+      score: Math.round(((entry.correct || 0) / (entry.total || 1)) * 100),
+    });
+  } catch {
+    try {
+      const local = JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
+      local.unshift({ ...entry, date: Date.now() });
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(local.slice(0, 50)));
+    } catch {}
+  }
+}
   } catch {}
 }
 
