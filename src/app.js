@@ -928,9 +928,9 @@ async function checkForSharedQuiz() {
   if (!id) return;
 
   try {
-    const { data, error } = await sb.from('shared_quizzes').select('data').eq('id', id).single();
-    if (error || !data) throw new Error('Not found');
-    const decoded = data;
+    const { data: row, error } = await sb.from('shared_quizzes').select('data').eq('id', id).single();
+    if (error || !row) throw new Error('Not found');
+    const decoded = row.data;
 
     state.quiz = {
       title: decoded.t,
