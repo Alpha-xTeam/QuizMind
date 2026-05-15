@@ -1,31 +1,92 @@
+import { createHash } from 'crypto';
+
 const API_KEY = process.env.MISTRAL_API_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const API_URL = 'https://api.mistral.ai/v1/chat/completions';
 
-export const handler = async (event) => {
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
+const ALLOWED_ORIGINS = ['https://quiz-mind.netlify.app', 'http://localhost:8888'];
+
+const headersSupabase = {
+  'Content-Type': 'application/json',
+  'apikey': SUPABASE_KEY,
+  'Authorization': `Bearer ${SUPABASE_KEY}`,
+};
+
+function getCorsHeaders(origin) {
+  return {
+    'Access-Control-Allow-Origin': ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json',
+    'Vary': 'Origin',
   };
+}
+
+function hashIP(ip) {
+  return createHash('sha256').update(ip + 'quizmind-salt').digest('hex').substring(0, 16);
+}
+
+async function checkRateLimit(ip, endpoint, maxRequests, windowMinutes) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return true;
+  const ipHash = hashIP(ip);
+  const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000).toISOString();
+
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/rate_limits?ip_hash=eq.${ipHash}&endpoint=eq.${endpoint}&window_start=gte.${windowStart}&order=window_start.desc&limit=1`,
+      { headers: headersSupabase }
+    );
+    const rows = await res.json();
+    const currentCount = rows?.[0]?.request_count ?? 0;
+
+    if (currentCount >= maxRequests) return false;
+
+    if (currentCount === 0) {
+      await fetch(`${SUPABASE_URL}/rest/v1/rate_limits`, {
+        method: 'POST', headers: headersSupabase,
+        body: JSON.stringify({ ip_hash: ipHash, endpoint, window_start: new Date().toISOString(), request_count: 1 }),
+      });
+    } else {
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/rate_limits?ip_hash=eq.${ipHash}&endpoint=eq.${endpoint}&window_start=gte.${windowStart}`,
+        { method: 'PATCH', headers: headersSupabase, body: JSON.stringify({ request_count: currentCount + 1 }) }
+      );
+    }
+    return true;
+  } catch { return true; }
+}
+
+export const handler = async (event) => {
+  const origin = event.headers.origin || '';
+  const headers = getCorsHeaders(origin);
+  const clientIP = event.headers['x-nf-client-connection-ip'] || event.headers['x-forwarded-for'] || 'unknown';
 
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
   if (!API_KEY) return { statusCode: 500, headers, body: JSON.stringify({ error: 'Server configuration error' }) };
 
-  const contentType = event.headers['content-type'] || '';
-  if (!contentType.includes('application/json')) return { statusCode: 415, headers, body: JSON.stringify({ error: 'Unsupported content type' }) };
+  const allowed = await checkRateLimit(clientIP, 'generate-quiz', 10, 1);
+  if (!allowed) {
+    return { statusCode: 429, headers, body: JSON.stringify({ error: 'طلبات كثيرة جدًا. حاول بعد شوي.' }) };
+  }
+
+  if (!event.headers['content-type']?.includes('application/json')) {
+    return { statusCode: 415, headers, body: JSON.stringify({ error: 'Unsupported content type' }) };
+  }
 
   try {
     const { text, numQuestions = 5, quizType = 'mcq', difficulty = 'medium', language = 'arabic' } = JSON.parse(event.body);
 
-    if (!text || typeof text !== 'string' || text.trim().length === 0) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid or empty text' }) };
+    if (!text || typeof text !== 'string' || text.trim().length < 20) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'النص قصير جدًا أو فارغ' }) };
     }
+      if (text.length > 30000) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'النص طويل جدًا. الحد الأقصى 30,000 حرف' }) };
+      }
 
     const difficultyHint = { easy: 'basic recall', medium: 'comprehension', hard: 'analysis' };
     const truncated = text.substring(0, 12000);
-
     const isFill = quizType === 'fill';
 
     const formatJSON = isFill
@@ -89,7 +150,6 @@ ${truncated}`;
       return { statusCode: 502, headers, body: JSON.stringify({ error: 'Failed to parse quiz JSON', raw: content }) };
     }
 
-    // indicate quiz type in response
     quiz._type = isFill ? 'fill' : 'mcq';
 
     return { statusCode: 200, headers, body: JSON.stringify(quiz) };
