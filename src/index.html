@@ -308,58 +308,87 @@
         <div id="historyList"></div>
       </section>
       <section class="about-section" id="aboutSection" hidden>
+        <div class="about-glow"></div>
         <div class="about-header">
-          <div class="about-header-left">
-            <button class="header-icon-btn" id="backFromAboutBtn" title="رجوع">
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M11 4L6 9L11 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </button>
-            <h3>من نحن</h3>
-          </div>
+          <button class="header-icon-btn" id="backFromAboutBtn" title="رجوع">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M11 4L6 9L11 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <div class="about-header-badge">من نحن</div>
         </div>
         <div class="about-content">
-          <div class="about-logo">
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-              <rect width="48" height="48" rx="12" fill="#10b981" />
-              <path d="M12 24l8 8 16-16" stroke="#0a0a0a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </div>
-          <h2>QuizMind</h2>
-          <p class="about-tagline">مولد الامتحانات بالذكاء الاصطناعي</p>
-          <div class="about-divider"></div>
-          <div class="about-developer">
-            <div class="about-avatar">
-              <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
-                <rect width="56" height="56" rx="28" fill="rgba(16,185,129,.15)"/>
-                <path d="M28 22a6 6 0 100 12 6 6 0 000-12zM18 42c0-5.523 4.477-10 10-10s10 4.477 10 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <div class="about-hero-icon">
+            <div class="about-icon-ring"></div>
+            <div class="about-icon-inner">
+              <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                <rect width="40" height="40" rx="10" fill="#10b981"/>
+                <path d="M10 20l7 7 14-14" stroke="#0a0a0a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </div>
-            <div class="about-info">
-              <span class="about-label">المطور</span>
-              <span class="about-name">حسين حيدر صبيح</span>
-              <a href="https://instagram.com/it.hussien" target="_blank" rel="noopener" class="about-instagram">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          </div>
+          <h2 class="about-title">QuizMind</h2>
+          <p class="about-tagline">مولد الامتحانات بالذكاء الاصطناعي</p>
+
+          <div class="about-card about-dev-card">
+            <div class="about-card-glow"></div>
+            <div class="about-avatar-wrap">
+              <div class="about-avatar-ring">
+                <svg viewBox="0 0 100 100" class="about-avatar-svg">
+                  <defs>
+                    <linearGradient id="avatarGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#10b981"/>
+                      <stop offset="100%" stop-color="#06b6d4"/>
+                    </linearGradient>
+                  </defs>
+                  <circle cx="50" cy="50" r="46" fill="none" stroke="url(#avatarGrad)" stroke-width="2" stroke-dasharray="8 6" opacity="0.6"/>
+                </svg>
+              </div>
+              <div class="about-avatar-solid">
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                  <path d="M20 14a5 5 0 110 10 5 5 0 010-10zM12 32c0-4.418 3.582-8 8-8s8 3.582 8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              </div>
+            </div>
+            <div class="about-dev-info">
+              <span class="about-dev-label">المطور</span>
+              <span class="about-dev-name">حسين حيدر صبيح</span>
+              <a href="https://instagram.com/it.hussien" target="_blank" rel="noopener" class="about-instagram-link">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                   <rect x="1.5" y="1.5" width="13" height="13" rx="3.5" stroke="currentColor" stroke-width="1.3"/>
                   <circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.3"/>
                   <circle cx="11.5" cy="4.5" r="1" fill="currentColor"/>
                 </svg>
-                @it.hussien
-                <svg class="verified-badge" width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <rect width="16" height="16" rx="8" fill="#10b981"/>
-                  <path d="M5 8l2 2 4-4" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
+                <span>@it.hussien</span>
+                <span class="verified-badge">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <rect width="16" height="16" rx="8" fill="#10b981"/>
+                    <path d="M5 8l2 2 4-4" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </span>
               </a>
             </div>
           </div>
-          <div class="about-divider"></div>
-          <p class="about-desc">
-            QuizMind هو تطبيق ذكي يتيح لك تحويل محاضراتك وملفاتك النصية إلى اختبارات تفاعلية باستخدام تقنيات الذكاء الاصطناعي. ارفع ملف PDF أو نص واحصل على امتحان مخصص فوراً.
-          </p>
-          <div class="about-tech">
-            <span class="tech-badge">Mistral AI</span>
-            <span class="tech-badge">PWA</span>
-            <span class="tech-badge">PDF.js</span>
+
+          <div class="about-card about-desc-card">
+            <p class="about-desc">
+              QuizMind هو تطبيق ذكي يتيح لك تحويل محاضراتك وملفاتك النصية إلى اختبارات تفاعلية باستخدام تقنيات الذكاء الاصطناعي. ارفع ملف PDF أو نص واحصل على امتحان مخصص فوراً.
+            </p>
+          </div>
+
+          <div class="about-stats">
+            <div class="about-stat">
+              <span class="about-stat-value">AI</span>
+              <span class="about-stat-label">Mistral AI</span>
+            </div>
+            <div class="about-stat">
+              <span class="about-stat-value">PWA</span>
+              <span class="about-stat-label">Offline Ready</span>
+            </div>
+            <div class="about-stat">
+              <span class="about-stat-value">PDF</span>
+              <span class="about-stat-label">Parser</span>
+            </div>
           </div>
         </div>
       </section>
