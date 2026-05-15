@@ -58,6 +58,7 @@ const DOM = {
   historyEmpty: document.getElementById('historyEmpty'),
   clearHistoryBtn: document.getElementById('clearHistoryBtn'),
   backFromHistoryBtn: document.getElementById('backFromHistoryBtn'),
+  totalExamsCount: document.getElementById('totalExamsCount'),
   aboutBtn: document.getElementById('aboutBtn'),
   aboutSection: document.getElementById('aboutSection'),
   backFromAboutBtn: document.getElementById('backFromAboutBtn'),
@@ -68,6 +69,32 @@ const DOM = {
 const LABELS_AR = ['أ', 'ب', 'ج', 'د'];
 const LABELS_EN = ['A', 'B', 'C', 'D'];
 const HISTORY_KEY = 'quizmind_history';
+
+async function fetchStats() {
+  try {
+    const res = await fetch('/api/db?type=stats');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (DOM.totalExamsCount) {
+      DOM.totalExamsCount.textContent = data.total_exams || 0;
+    }
+  } catch {}
+}
+
+async function incrementStats() {
+  try {
+    const res = await fetch('/api/db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'increment_stats' }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (DOM.totalExamsCount) {
+      DOM.totalExamsCount.textContent = data.total_exams || 0;
+    }
+  } catch {}
+}
 
 // ─── Snackbar ───────────────────────────────────────
 
@@ -121,19 +148,54 @@ document.addEventListener('fullscreenchange', () => {
 
 // ─── History (localStorage) ─────────────────────────
 
-function getHistory() {
-  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
-  catch { return []; }
+async function getHistory() {
+  try {
+    const res = await fetch('/api/db');
+    if (!res.ok) throw new Error('Failed to fetch');
+    const data = await res.json();
+    return data.map(e => ({
+      title: e.title,
+      correct: e.correct_answers,
+      total: e.total_questions,
+      difficulty: e.difficulty,
+      date: new Date(e.created_at).getTime(),
+    }));
+  } catch {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
+    catch { return []; }
+  }
 }
 
-function addHistory(entry) {
-  const list = getHistory();
-  list.unshift({ ...entry, date: Date.now() });
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, 50)));
+async function addHistory(entry) {
+  try {
+    const totalQuestions = entry.total || 1;
+    const correctAnswers = entry.correct || 0;
+    const score = Math.round((correctAnswers / totalQuestions) * 100);
+
+    await fetch('/api/db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: entry.title || 'امتحان',
+        difficulty: entry.difficulty || 'medium',
+        language: 'arabic',
+        quiz_type: 'mcq',
+        total_questions: totalQuestions,
+        correct_answers: correctAnswers,
+        score,
+      }),
+    });
+  } catch {
+    try {
+      const local = JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
+      local.unshift({ ...entry, date: Date.now() });
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(local.slice(0, 50)));
+    } catch {}
+  }
 }
 
-function renderHistory() {
-  const list = getHistory();
+async function renderHistory() {
+  const list = await getHistory();
   DOM.historyEmpty.hidden = list.length > 0;
   DOM.historyList.innerHTML = list.map((e, i) => {
     const pct = Math.round((e.correct / e.total) * 100);
@@ -153,12 +215,12 @@ function renderHistory() {
 
 let historySource = 'upload';
 
-DOM.historyBtn.addEventListener('click', () => {
+DOM.historyBtn.addEventListener('click', async () => {
   if (DOM.historySection.hidden) {
     historySource = DOM.uploadSection.hidden ? 'results' : 'upload';
     DOM.historySection.hidden = false;
     if (historySource === 'upload') DOM.uploadSection.hidden = true;
-    renderHistory();
+    await renderHistory();
   } else {
     DOM.historySection.hidden = true;
     if (historySource === 'upload') DOM.uploadSection.hidden = false;
@@ -190,10 +252,10 @@ DOM.backFromAboutBtn.addEventListener('click', () => {
   if (historySource === 'upload') DOM.uploadSection.hidden = false;
 });
 
-DOM.clearHistoryBtn.addEventListener('click', () => {
+DOM.clearHistoryBtn.addEventListener('click', async () => {
   if (confirm('حذف جميع الامتحانات السابقة؟')) {
     localStorage.removeItem(HISTORY_KEY);
-    renderHistory();
+    await renderHistory();
     showSnackbar('تم الحذف');
   }
 });
@@ -331,6 +393,7 @@ DOM.generateBtn.addEventListener('click', async () => {
     state.quizType = quizType;
     state.answers = new Array(state.quiz.questions.length).fill(null);
     state.currentQuestion = 0;
+    incrementStats();
 
     DOM.loadingSection.hidden = true;
     const isEnglish = DOM.language.value === 'english';
@@ -502,7 +565,7 @@ document.addEventListener('keydown', (e) => {
 
 // ─── Results ────────────────────────────────────────
 
-function showResults() {
+async function showResults() {
 
   const questions = state.quiz.questions;
   if (!DOM.practiceMode?.checked) {
@@ -526,7 +589,7 @@ function showResults() {
 
   const score = Math.round((correct / questions.length) * 100);
 
-  addHistory({
+  await addHistory({
     title: state.quiz.title,
     correct,
     total: questions.length,
@@ -860,6 +923,7 @@ function checkForSharedQuiz() {
 
 // Check on page load
 checkForSharedQuiz();
+fetchStats();
 
 // Also check on hash change
 window.addEventListener('hashchange', checkForSharedQuiz);
