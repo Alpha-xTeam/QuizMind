@@ -7,6 +7,7 @@ const state = {
   answers: [],
   reviewed: false,
   isShared: false,
+  quizSharedId: null,
 };
 
 const DOM = {
@@ -126,21 +127,13 @@ async function addHistory(entry) {
     } catch {}
   }
 }
-  } catch {}
-}
 
 async function incrementStats() {
   try {
-    const res = await fetch('/api/db', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'increment_stats' }),
-    });
-    if (!res.ok) return;
-    const data = await res.json();
-    if (DOM.totalExamsCount) {
-      DOM.totalExamsCount.textContent = data.total_exams || 0;
-    }
+    const { data: current } = await sb.from('app_stats').select('total_exams').eq('id', 'global').single();
+    const newCount = (current?.total_exams ?? 0) + 1;
+    await sb.from('app_stats').update({ total_exams: newCount, updated_at: new Date().toISOString() }).eq('id', 'global');
+    if (DOM.totalExamsCount) DOM.totalExamsCount.textContent = newCount;
   } catch {}
 }
 
@@ -700,9 +693,8 @@ DOM.shareResultBtn.addEventListener('click', () => {
 });
 
 // Share quiz with friend
-DOM.shareQuizBtn.addEventListener('click', () => {
+DOM.shareQuizBtn.addEventListener('click', async () => {
   try {
-    // Create a minimal quiz data without answers
     const shareData = {
       t: state.quiz.title,
       q: state.quiz.questions.map(q => ({
@@ -716,27 +708,35 @@ DOM.shareQuizBtn.addEventListener('click', () => {
       tp: state.quizType
     };
 
-    const json = JSON.stringify(shareData);
-    const bytes = new TextEncoder().encode(json);
-    const encoded = btoa(String.fromCharCode(...new Uint8Array(bytes)));
-    const shareUrl = `${window.location.origin}${window.location.pathname}#quiz=${encoded}`;
-
-    // Copy to clipboard
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        showSnackbar('تم نسخ رابط الامتحان - أرسله لصديقك! 📤');
-      }).catch(() => {
-        fallbackCopy(shareUrl);
-        showSnackbar('تم نسخ رابط الامتحان - أرسله لصديقك! 📤');
-      });
-    } else {
-      fallbackCopy(shareUrl);
-      showSnackbar('تم نسخ رابط الامتحان - أرسله لصديقك! 📤');
+    if (state.quizSharedId) {
+      const shareUrl = `${window.location.origin}${window.location.pathname}?s=${state.quizSharedId}`;
+      return copyShareUrl(shareUrl);
     }
+
+    const id = crypto.randomUUID().substring(0, 8);
+    await sb.from('shared_quizzes').insert({ id, data: shareData });
+
+    state.quizSharedId = id;
+    const shareUrl = `${window.location.origin}${window.location.pathname}?s=${id}`;
+    copyShareUrl(shareUrl);
   } catch (err) {
     showSnackbar('حدث خطأ في إنشاء الرابط');
   }
 });
+
+function copyShareUrl(url) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      showSnackbar('تم نسخ رابط الامتحان - أرسله لصديقك!');
+    }).catch(() => {
+      fallbackCopy(url);
+      showSnackbar('تم نسخ رابط الامتحان - أرسله لصديقك!');
+    });
+  } else {
+    fallbackCopy(url);
+    showSnackbar('تم نسخ رابط الامتحان - أرسله لصديقك!');
+  }
+}
 
 function fallbackCopy(text) {
   const ta = document.createElement('textarea');
@@ -922,50 +922,49 @@ DOM.newQuizBtn.addEventListener('click', () => {
 
 // ─── Handle Shared Quiz Link ──────────────────────────
 
-function checkForSharedQuiz() {
-  const hash = window.location.hash;
-  if (hash.startsWith('#quiz=')) {
-    try {
-      const encoded = hash.substring(6);
-      const decoded = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded), c => c.charCodeAt(0))));
+async function checkForSharedQuiz() {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('s');
+  if (!id) return;
 
-      // Create quiz object from shared data
-      state.quiz = {
-        title: decoded.t,
-        questions: decoded.q.map((q, i) => ({
-          question: q.q,
-          options: q.o,
-          correctAnswer: q.a,
-          explanation: q.e
-        }))
-      };
-      state.quizType = decoded.tp || 'mcq';
-      state.answers = new Array(state.quiz.questions.length).fill(null);
-      state.currentQuestion = 0;
-      state.isShared = true;
+  try {
+    const { data, error } = await sb.from('shared_quizzes').select('data').eq('id', id).single();
+    if (error || !data) throw new Error('Not found');
+    const decoded = data;
 
-      // Apply language direction
-      if (decoded.l === 'english') {
-        DOM.quizSection.classList.add('dir-ltr');
-      } else {
-        DOM.quizSection.classList.remove('dir-ltr');
-      }
+    state.quiz = {
+      title: decoded.t,
+      questions: decoded.q.map(q => ({
+        question: q.q,
+        options: q.o,
+        correctAnswer: q.a,
+        explanation: q.e
+      }))
+    };
+    state.quizType = decoded.tp || 'mcq';
+    state.answers = new Array(state.quiz.questions.length).fill(null);
+    state.currentQuestion = 0;
+    state.isShared = true;
+    state.quizSharedId = id;
 
-      // Hide upload, show quiz
-      DOM.uploadSection.hidden = true;
-      DOM.loadingSection.hidden = true;
-      DOM.historySection.hidden = true;
-      renderQuiz(decoded.l === 'english');
-      DOM.quizSection.hidden = false;
-
-      // Clean URL
-      history.replaceState(null, '', window.location.pathname);
-
-      showSnackbar('🧪 امتحان جديد - جاهز للبدء!');
-    } catch (err) {
-      console.error('Error loading shared quiz:', err);
-      showSnackbar('رابط الامتحان غير صالح');
+    if (decoded.l === 'english') {
+      DOM.quizSection.classList.add('dir-ltr');
+    } else {
+      DOM.quizSection.classList.remove('dir-ltr');
     }
+
+    DOM.uploadSection.hidden = true;
+    DOM.loadingSection.hidden = true;
+    DOM.historySection.hidden = true;
+    renderQuiz(decoded.l === 'english');
+    DOM.quizSection.hidden = false;
+
+    history.replaceState(null, '', window.location.pathname);
+
+    showSnackbar('امتحان جديد - جاهز للبدء!');
+  } catch (err) {
+    console.error('Error loading shared quiz:', err);
+    showSnackbar('رابط الامتحان غير صالح');
   }
 }
 
@@ -973,5 +972,30 @@ function checkForSharedQuiz() {
 checkForSharedQuiz();
 fetchStats();
 
-// Also check on hash change
-window.addEventListener('hashchange', checkForSharedQuiz);
+// Also check on hash change (backward compat)
+window.addEventListener('hashchange', () => {
+  const hash = window.location.hash;
+  if (hash.startsWith('#quiz=')) {
+    try {
+      const encoded = hash.substring(6);
+      const decoded = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded), c => c.charCodeAt(0))));
+      state.quiz = {
+        title: decoded.t,
+        questions: decoded.q.map(q => ({ question: q.q, options: q.o, correctAnswer: q.a, explanation: q.e }))
+      };
+      state.quizType = decoded.tp || 'mcq';
+      state.answers = new Array(state.quiz.questions.length).fill(null);
+      state.currentQuestion = 0;
+      state.isShared = true;
+      if (decoded.l === 'english') DOM.quizSection.classList.add('dir-ltr');
+      else DOM.quizSection.classList.remove('dir-ltr');
+      DOM.uploadSection.hidden = true;
+      DOM.loadingSection.hidden = true;
+      DOM.historySection.hidden = true;
+      renderQuiz(decoded.l === 'english');
+      DOM.quizSection.hidden = false;
+      history.replaceState(null, '', window.location.pathname);
+      showSnackbar('امتحان جديد - جاهز للبدء!');
+    } catch { showSnackbar('رابط الامتحان غير صالح'); }
+  }
+});
