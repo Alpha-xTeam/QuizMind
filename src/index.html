@@ -235,10 +235,18 @@
         <div class="quiz-header">
           <div class="quiz-meta">
             <h2 id="quizTitle">الامتحان</h2>
-            <div class="quiz-stats">
-              <span class="stat-badge" id="currentQuestion">1</span>
-              <span class="stat-sep">/</span>
-              <span class="stat-badge" id="totalQuestions">5</span>
+            <div class="quiz-meta-left">
+              <div class="quiz-taken-badge" id="quizTakenBadge" hidden>
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                  <path d="M7 1a6 6 0 100 12A6 6 0 007 1zM7 4v3.5M7 10h.01" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                </svg>
+                <span id="quizTakenCount">0</span>
+              </div>
+              <div class="quiz-stats">
+                <span class="stat-badge" id="currentQuestion">1</span>
+                <span class="stat-sep">/</span>
+                <span class="stat-badge" id="totalQuestions">5</span>
+              </div>
             </div>
           </div>
           <div class="quiz-progress-bar">

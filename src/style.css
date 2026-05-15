@@ -537,6 +537,30 @@ body{
   font-weight:700;
 }
 
+.quiz-meta-left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.quiz-taken-badge{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  padding:5px 12px;
+  border-radius:999px;
+  background:rgba(16,185,129,.08);
+  border:1px solid rgba(16,185,129,.12);
+  color:var(--accent);
+  font-size:.75rem;
+  font-weight:600;
+  white-space:nowrap;
+}
+
+[data-theme="light"] .quiz-taken-badge{
+  background:rgba(16,185,129,.06);
+}
+
 .quiz-stats{
   display:flex;
   align-items:center;

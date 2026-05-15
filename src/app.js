@@ -33,6 +33,8 @@ const DOM = {
   currentQuestion: document.getElementById('currentQuestion'),
   totalQuestions: document.getElementById('totalQuestions'),
   quizProgressFill: document.getElementById('quizProgressFill'),
+  quizTakenBadge: document.getElementById('quizTakenBadge'),
+  quizTakenCount: document.getElementById('quizTakenCount'),
   questionsContainer: document.getElementById('questionsContainer'),
   prevBtn: document.getElementById('prevBtn'),
   nextBtn: document.getElementById('nextBtn'),
@@ -435,6 +437,7 @@ DOM.generateBtn.addEventListener('click', async () => {
     state.answers = new Array(state.quiz.questions.length).fill(null);
     state.currentQuestion = 0;
     state.quizSharedId = null;
+    if (DOM.quizTakenBadge) DOM.quizTakenBadge.hidden = true;
     incrementStats();
 
     DOM.loadingSection.hidden = true;
@@ -919,6 +922,7 @@ DOM.newQuizBtn.addEventListener('click', () => {
   DOM.historySection.hidden = true;
   DOM.uploadSection.hidden = false;
   DOM.scoreCircle.style.strokeDashoffset = 314;
+  if (DOM.quizTakenBadge) DOM.quizTakenBadge.hidden = true;
   resetFile();
 });
 
@@ -930,9 +934,12 @@ async function checkForSharedQuiz() {
   if (!id) return;
 
   try {
-    const { data: row, error } = await sb.from('shared_quizzes').select('data').eq('id', id).single();
+    const { data: row, error } = await sb.from('shared_quizzes').select('data, times_taken').eq('id', id).single();
     if (error || !row) throw new Error('Not found');
     const decoded = row.data;
+    const takenCount = row.times_taken || 0;
+
+    await sb.from('shared_quizzes').update({ times_taken: takenCount + 1 }).eq('id', id);
 
     state.quiz = {
       title: decoded.t,
@@ -960,6 +967,11 @@ async function checkForSharedQuiz() {
     DOM.historySection.hidden = true;
     renderQuiz(decoded.l === 'english');
     DOM.quizSection.hidden = false;
+
+    if (DOM.quizTakenBadge && takenCount > 0) {
+      DOM.quizTakenCount.textContent = takenCount;
+      DOM.quizTakenBadge.hidden = false;
+    }
 
     history.replaceState(null, '', window.location.pathname);
 
