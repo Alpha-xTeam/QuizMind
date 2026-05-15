@@ -937,9 +937,9 @@ async function checkForSharedQuiz() {
     const { data: row, error } = await sb.from('shared_quizzes').select('data, times_taken').eq('id', id).single();
     if (error || !row) throw new Error('Not found');
     const decoded = row.data;
-    const takenCount = row.times_taken || 0;
+    const takenCount = (row.times_taken || 0) + 1;
 
-    await sb.from('shared_quizzes').update({ times_taken: takenCount + 1 }).eq('id', id);
+    await sb.from('shared_quizzes').update({ times_taken: takenCount }).eq('id', id);
 
     state.quiz = {
       title: decoded.t,
@@ -968,7 +968,7 @@ async function checkForSharedQuiz() {
     renderQuiz(decoded.l === 'english');
     DOM.quizSection.hidden = false;
 
-    if (DOM.quizTakenBadge && takenCount > 0) {
+    if (DOM.quizTakenBadge) {
       DOM.quizTakenCount.textContent = takenCount;
       DOM.quizTakenBadge.hidden = false;
     }
