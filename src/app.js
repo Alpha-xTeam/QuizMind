@@ -58,6 +58,9 @@ const DOM = {
   historyEmpty: document.getElementById('historyEmpty'),
   clearHistoryBtn: document.getElementById('clearHistoryBtn'),
   backFromHistoryBtn: document.getElementById('backFromHistoryBtn'),
+  aboutBtn: document.getElementById('aboutBtn'),
+  aboutSection: document.getElementById('aboutSection'),
+  backFromAboutBtn: document.getElementById('backFromAboutBtn'),
 };
 
 // ─── Labels ─────────────────────────────────────────
@@ -164,6 +167,26 @@ DOM.historyBtn.addEventListener('click', () => {
 
 DOM.backFromHistoryBtn.addEventListener('click', () => {
   DOM.historySection.hidden = true;
+  if (historySource === 'upload') DOM.uploadSection.hidden = false;
+});
+
+// ─── About ────────────────────────────────────────
+
+DOM.aboutBtn.addEventListener('click', () => {
+  if (DOM.aboutSection.hidden) {
+    historySource = DOM.uploadSection.hidden ? 'results' : 'upload';
+    DOM.aboutSection.hidden = false;
+    if (historySource === 'upload') DOM.uploadSection.hidden = true;
+    if (!DOM.resultsSection.hidden) DOM.resultsSection.hidden = true;
+    if (!DOM.quizSection.hidden) DOM.quizSection.hidden = true;
+  } else {
+    DOM.aboutSection.hidden = true;
+    if (historySource === 'upload') DOM.uploadSection.hidden = false;
+  }
+});
+
+DOM.backFromAboutBtn.addEventListener('click', () => {
+  DOM.aboutSection.hidden = true;
   if (historySource === 'upload') DOM.uploadSection.hidden = false;
 });
 
@@ -582,8 +605,9 @@ DOM.shareQuizBtn.addEventListener('click', () => {
       tp: state.quizType
     };
 
-    // Encode to base64
-    const encoded = btoa(encodeURIComponent(JSON.stringify(shareData)));
+    const json = JSON.stringify(shareData);
+    const bytes = new TextEncoder().encode(json);
+    const encoded = btoa(String.fromCharCode(...new Uint8Array(bytes)));
     const shareUrl = `${window.location.origin}${window.location.pathname}#quiz=${encoded}`;
 
     // Copy to clipboard
@@ -792,7 +816,7 @@ function checkForSharedQuiz() {
   if (hash.startsWith('#quiz=')) {
     try {
       const encoded = hash.substring(6);
-      const decoded = JSON.parse(decodeURIComponent(atob(encoded)));
+      const decoded = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded), c => c.charCodeAt(0))));
 
       // Create quiz object from shared data
       state.quiz = {
